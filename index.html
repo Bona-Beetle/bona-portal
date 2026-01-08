@@ -37,13 +37,12 @@
         }
 
         /* ============================================================
-           🚀 【V6.31 終極 A4 單頁列印引擎】
+           🚀 【V6.32 終極 A4 單頁列印引擎 - 圖表強化版】
            ============================================================ */
         
         .print-only-cert { display: none; }
 
         @media print {
-            /* 1. 設定 A4 無邊距 */
             @page { 
                 size: A4; 
                 margin: 0; 
@@ -55,21 +54,19 @@
                 color: black !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                height: 100%;
-                overflow: hidden !important; /* 強制不分頁 */
+                height: 100vh;
+                overflow: hidden !important; 
             }
 
-            /* 2. 隱藏網頁 UI */
             #web-view-ui, .no-print, .bg-grid { 
                 display: none !important; 
             }
 
-            /* 3. 列印佈局精細化 (確保單頁) */
             .print-only-cert { 
                 display: block !important; 
                 background: white !important;
                 color: black !important;
-                padding: 30px !important; /* 縮減間距防止溢出 */
+                padding: 25px !important; 
                 width: 210mm;
                 height: 297mm;
                 box-sizing: border-box;
@@ -77,24 +74,25 @@
             }
 
             .cert-border { 
-                border: 3px solid #CA8A04 !important; 
-                padding: 30px !important;
+                border: 4px solid #CA8A04 !important; 
+                padding: 25px !important;
                 height: 100% !important;
                 display: flex;
                 flex-direction: column;
             }
 
-            /* 強制顯影設定 */
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .cert-gold-text { color: #CA8A04 !important; font-weight: 900 !important; }
-            .cert-bg-gray { background-color: #f8f8f8 !important; border: 1px solid #eee !important; }
+            .cert-bg-gray { background-color: #f5f5f5 !important; border: 1px solid #ddd !important; }
             
-            /* 圖表區域修正 */
+            /* 列印圖表佈局 */
             .print-chart-box {
-                margin: 20px 0;
-                height: 220px; /* 固定高度以防推擠 */
-                border: 1px solid #eee;
+                margin: 15px 0;
+                height: 240px; 
+                border: 1px solid #ddd;
                 background: #fff;
+                border-radius: 12px;
+                padding: 15px;
             }
         }
 
@@ -119,11 +117,15 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- 全域配置 ---
+        // --- 全域核心配置 ---
         const BRAND_NAME = "BONA BEETLE";
         const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/6whq8i6ov4nzs7qdya3diycuq6txy6wn"; 
         const LOGO_FILENAME = "logo.png"; 
         const EFF_CONSTANT = 3.48;
+
+        // 圖表座標常數 - 視角拉遠關鍵 (提升 Max 值讓曲線縮小)
+        const MAX_DAYS = 700;
+        const MAX_WEIGHT = 75;
 
         const App = () => {
             const [view, setView] = useState('input'); 
@@ -135,7 +137,7 @@
             const [formData, setFormData] = useState({ id: '', w: '', hatch: '', check: new Date().toISOString().split('T')[0], sub: '木屑' });
             const [report, setReport] = useState(null);
 
-            // 120mm 黃金基線
+            // 120mm 黃金基線數據點
             const BASELINE = [ { x: 0, y: 0 }, { x: 150, y: 25 }, { x: 280, y: 46 }, { x: 440, y: 49 }, { x: 560, y: 37 } ];
 
             const handleAnalyze = (e) => {
@@ -148,7 +150,7 @@
                 let advice = "成長斜率驚人，個體正處於穩定的熟化期。建議鎖定溫控節奏，以最大化大顎角質密度。";
                 if (w < 45) {
                     status = "發育偏緩";
-                    advice = "偵測到轉換效率偏低。目前個體位點稍低於黃金基準線，建議適度添加「登大蟲」優化下一階段的骨架轉化效能。";
+                    advice = "偵測到轉換效率偏低。目前個體位點低於黃金基準線，建議適度添加「登大蟲」優化下一階段的骨架轉化效能。";
                 }
 
                 setTimeout(() => {
@@ -185,8 +187,8 @@
                 );
             };
 
-            const getX = (d) => (d / 650) * 100; 
-            const getY = (w) => 100 - (w / 65) * 100;
+            const getX = (d) => (d / MAX_DAYS) * 100; 
+            const getY = (w) => 100 - (w / MAX_WEIGHT) * 100;
 
             if (view === 'input') return (
                 <div className="min-h-screen flex items-center justify-center p-6 text-left relative">
@@ -265,17 +267,32 @@
                                             <div className="text-right text-2xl font-black text-white font-mono">{report.days} <span className="text-xs text-[#CA8A04]">Days</span></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4 font-bold">
-                                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left"><div className="text-[9px] text-gray-600 uppercase font-black mb-2">鑑定評級</div><div className="text-sm font-black uppercase text-[#CA8A04]">● {report.status}</div></div>
-                                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left"><div className="text-[9px] text-gray-600 uppercase font-black mb-2">當前食材</div><div className="text-sm font-black text-white uppercase">{report.sub} (PRO)</div></div>
+                                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left"><div className="text-[9px] text-gray-600 uppercase font-black mb-2 tracking-widest">鑑定評級</div><div className={`text-sm font-black uppercase text-[#CA8A04]`}>● {report.status}</div></div>
+                                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left"><div className="text-[9px] text-gray-600 uppercase font-black mb-2 tracking-widest">當前食材</div><div className="text-sm font-black text-white uppercase">{report.sub} (PRO)</div></div>
                                         </div>
                                     </div>
                                 )}
                                 {activeTab === 'path' && (
-                                    <div className="space-y-8 animate-fade-up text-left font-bold">
-                                        <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2"><span className="w-2 h-2 bg-[#CA8A04] rounded-full animate-pulse text-left"></span>台灣 PGK 巔峰對標</h3>
-                                        <div className="h-64 w-full border-l border-b border-zinc-800 relative flex items-end px-4 overflow-hidden bg-black/60 rounded-2xl">
-                                            <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible"><path d={`M ${BASELINE.map(p => `${getX(p.x)},${getY(p.y)}`).join(' L ')}`} fill="none" stroke="rgba(202, 138, 4, 0.2)" strokeWidth="1" strokeDasharray="3" /><circle cx={getX(report.days)} cy={getY(report.weight)} r="4" fill="#CA8A04" /><text x={getX(report.days)} y={getY(report.weight)-15} fill="#CA8A04" fontSize="5" textAnchor="middle" fontWeight="bold">當前落點: {report.weight}g</text></svg>
+                                    <div className="space-y-10 animate-fade-up text-left font-bold">
+                                        <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2"><span className="w-2 h-2 bg-[#CA8A04] rounded-full animate-pulse text-left"></span>全台 PGK 巔峰對標空間 (拉遠視角)</h3>
+                                        <div className="h-72 w-full border-l border-b border-zinc-800 relative flex items-end px-4 overflow-hidden bg-black/60 rounded-2xl">
+                                            {/* 圖表背景網格 */}
+                                            <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'linear-gradient(rgba(202, 138, 4, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(202, 138, 4, 0.1) 1px, transparent 1px)', backgroundSize: '10% 10%'}}></div>
+                                            
+                                            <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
+                                                {/* 黃金基準曲線 */}
+                                                <path d={`M ${BASELINE.map(p => `${getX(p.x)},${getY(p.y)}`).join(' L ')}`} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3" />
+                                                
+                                                {/* 當前落點點位 */}
+                                                <line x1={getX(report.days)} y1="100" x2={getX(report.days)} y2={getY(report.weight)} stroke="rgba(202, 138, 4, 0.2)" strokeWidth="0.5" strokeDasharray="2" />
+                                                <circle cx={getX(report.days)} cy={getY(report.weight)} r="4" fill="#CA8A04" className="animate-pulse shadow-lg" />
+                                                <text x={getX(report.days)} y={getY(report.weight)-12} fill="#CA8A04" fontSize="5" textAnchor="middle" fontWeight="black" className="italic">{report.weight}g</text>
+                                            </svg>
+                                            
+                                            <div className="absolute bottom-2 right-4 text-[8px] text-gray-600 font-mono">X: {MAX_DAYS} DAYS</div>
+                                            <div className="absolute top-4 left-4 text-[8px] text-gray-600 font-mono">Y: {MAX_WEIGHT}g</div>
                                         </div>
+                                        <div className="p-5 bg-zinc-900 rounded-2xl border border-white/5 flex justify-between items-center"><span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">模型吻合度分析</span><span className="text-sm font-black text-[#CA8A04]">HIGH PERFORMANCE</span></div>
                                     </div>
                                 )}
                                 {activeTab === 'advice' && (
@@ -291,11 +308,11 @@
                         <button onClick={()=>setView('input')} className="mt-8 text-[10px] text-gray-800 font-black uppercase tracking-[0.4em] hover:text-[#CA8A04] transition-all no-print mx-auto block font-bold">← 返回重新錄入 (RESET)</button>
                     </div>
 
-                    {/* 【列印專用沙盒】白底黑字 + 同步圖表 + 單頁鎖定 */}
+                    {/* 【列印專用沙盒】V6.32 視覺強化圖表 + A4 單頁 */}
                     {report && (
                         <div className="print-only-cert cert-border">
                             {/* 證書頁眉 */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #CA8A04', paddingBottom: '20px', marginBottom: '25px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '4px solid #CA8A04', paddingBottom: '15px', marginBottom: '20px' }}>
                                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div style={{ background: 'black', color: '#CA8A04', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '26px', borderRadius: '8px' }}>B</div>
                                     <div>
@@ -310,56 +327,64 @@
                             </div>
 
                             {/* 數據摘要 */}
-                            <div style={{ marginBottom: '25px' }}>
-                                <h2 style={{ fontSize: '12px', color: '#CA8A04', fontWeight: '900', textTransform: 'uppercase', marginBottom: '12px', borderLeft: '4px solid #CA8A04', paddingLeft: '10px' }}>數據概覽 / Summary</h2>
+                            <div style={{ marginBottom: '20px' }}>
+                                <h2 style={{ fontSize: '12px', color: '#CA8A04', fontWeight: '900', textTransform: 'uppercase', marginBottom: '10px', borderLeft: '4px solid #CA8A04', paddingLeft: '10px' }}>數據概覽 / Summary</h2>
                                 <div style={{ display: 'flex', gap: '40px' }}>
                                     <div>
                                         <p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>實測體重</p>
-                                        <p style={{ margin: 0, fontSize: '48px', fontWeight: '900' }}>{report.weight}<span style={{ fontSize: '16px', color: '#CA8A04', marginLeft: '3px' }}>g</span></p>
+                                        <p style={{ margin: 0, fontSize: '42px', fontWeight: '900' }}>{report.weight}<span style={{ fontSize: '14px', color: '#CA8A04', marginLeft: '3px' }}>g</span></p>
                                     </div>
                                     <div>
                                         <p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>量測日齡</p>
-                                        <p style={{ margin: 0, fontSize: '48px', fontWeight: '900' }}>{report.days}<span style={{ fontSize: '16px', color: '#CA8A04', marginLeft: '3px' }}>Days</span></p>
+                                        <p style={{ margin: 0, fontSize: '42px', fontWeight: '900' }}>{report.days}<span style={{ fontSize: '14px', color: '#CA8A04', marginLeft: '3px' }}>Days</span></p>
                                     </div>
                                     <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                                         <p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>預測尺寸</p>
-                                        <p style={{ margin: 0, fontSize: '48px', fontWeight: '900', color: '#CA8A04' }}>{report.potential}<span style={{ fontSize: '16px', color: '#000', marginLeft: '3px' }}>mm</span></p>
+                                        <p style={{ margin: 0, fontSize: '42px', fontWeight: '900', color: '#CA8A04' }}>{report.potential}<span style={{ fontSize: '14px', color: '#000', marginLeft: '3px' }}>mm</span></p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 【新增】列印圖表區域：同步顯示分頁 2 曲線 */}
-                            <div className="print-chart-box" style={{ padding: '15px', borderRadius: '12px' }}>
-                                <p style={{ margin: '0 0 10px 0', fontSize: '9px', fontWeight: '900', color: '#666', textTransform: 'uppercase' }}>生長軌跡對標 / Growth Trajectory</p>
-                                <div style={{ height: '160px', width: '100%', borderLeft: '2px solid #ddd', borderBottom: '2px solid #ddd', position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
-                                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                        {/* 基線 */}
-                                        <path d={`M ${BASELINE.map(p => `${getX(p.x)},${getY(p.y)}`).join(' L ')}`} fill="none" stroke="#eee" strokeWidth="1" strokeDasharray="2" />
-                                        {/* 個體點 */}
-                                        <circle cx={getX(report.days)} cy={getY(report.weight)} r="3" fill="#CA8A04" />
-                                        <text x={getX(report.days)} y={getY(report.weight)-10} fill="#CA8A04" fontSize="4" textAnchor="middle" fontWeight="900">{report.weight}g</text>
+                            {/* 【強化】列印圖表區域：拉遠視角 + 曲線強化 */}
+                            <div className="print-chart-box">
+                                <p style={{ margin: '0 0 8px 0', fontSize: '9px', fontWeight: '900', color: '#333', textTransform: 'uppercase' }}>生長軌跡對標 / Growth Trajectory (Scale 1:{MAX_DAYS})</p>
+                                <div style={{ height: '180px', width: '100%', borderLeft: '2px solid #ddd', borderBottom: '2px solid #ddd', position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
+                                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
+                                        {/* 列印網格 */}
+                                        <line x1="0" y1="20" x2="100" y2="20" stroke="#f0f0f0" strokeWidth="0.5" />
+                                        <line x1="0" y1="40" x2="100" y2="40" stroke="#f0f0f0" strokeWidth="0.5" />
+                                        <line x1="0" y1="60" x2="100" y2="60" stroke="#f0f0f0" strokeWidth="0.5" />
+                                        <line x1="0" y1="80" x2="100" y2="80" stroke="#f0f0f0" strokeWidth="0.5" />
+                                        
+                                        {/* 黃金基準線 */}
+                                        <path d={`M ${BASELINE.map(p => `${getX(p.x)},${getY(p.y)}`).join(' L ')}`} fill="none" stroke="#ccc" strokeWidth="1.5" strokeDasharray="2" />
+                                        
+                                        {/* 個體數據點 (強化顯影) */}
+                                        <line x1={getX(report.days)} y1="100" x2={getX(report.days)} y2={getY(report.weight)} stroke="#CA8A04" strokeWidth="0.5" strokeDasharray="1" />
+                                        <circle cx={getX(report.days)} cy={getY(report.weight)} r="3.5" fill="#CA8A04" stroke="black" strokeWidth="0.5" />
+                                        <text x={getX(report.days)} y={getY(report.weight)-12} fill="#CA8A04" fontSize="5" textAnchor="middle" fontWeight="900" fontStyle="italic">{report.weight}g</text>
                                     </svg>
-                                    <div style={{ position: 'absolute', bottom: '-15px', right: '0', fontSize: '8px', color: '#999' }}>Age: {report.days}D</div>
+                                    <div style={{ position: 'absolute', bottom: '-15px', right: '0', fontSize: '8px', color: '#999', fontWeight: 'bold' }}>700 Days Max</div>
                                 </div>
                             </div>
 
                             {/* AI 結論區 */}
-                            <div className="cert-bg-gray" style={{ padding: '25px', borderRadius: '20px', marginBottom: '25px', marginTop: 'auto' }}>
+                            <div className="cert-bg-gray" style={{ padding: '20px', borderRadius: '15px', marginBottom: '20px', marginTop: 'auto' }}>
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
                                     <div style={{ fontSize: '30px' }}>🧠</div>
                                     <div style={{ textAlign: 'left' }}>
-                                        <p style={{ margin: '0 0 8px 0', fontSize: '10px', fontWeight: '900', color: '#CA8A04', textTransform: 'uppercase' }}>Bona AI 專家診斷建議結論</p>
-                                        <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', fontWeight: '700', fontStyle: 'italic' }}>「{report.advice}」</p>
+                                        <p style={{ margin: '0 0 5px 0', fontSize: '10px', fontWeight: '900', color: '#CA8A04', textTransform: 'uppercase' }}>Bona AI 專家診斷建議結論</p>
+                                        <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', fontWeight: '700', fontStyle: 'italic' }}>「{report.advice}」</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* 頁尾認證 */}
-                            <div style={{ borderTop: '1px solid #EEE', paddingTop: '20px', textAlign: 'center' }}>
-                                <p style={{ fontSize: '9px', color: '#999', letterSpacing: '2px', fontWeight: 'bold' }}>
+                            <div style={{ borderTop: '1px solid #EEE', paddingTop: '15px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '8px', color: '#999', letterSpacing: '2px', fontWeight: 'bold' }}>
                                     本認證書由 Bona Beetle Systems AI 數據引擎自動分析生成 • Verified Scientific Data
                                 </p>
-                                <p style={{ fontSize: '8px', color: '#BBB', marginTop: '5px' }}>© 2024 Bona Beetle Lab • 轉化常數: {EFF_CONSTANT} mm/g</p>
+                                <p style={{ fontSize: '7px', color: '#BBB', marginTop: '5px' }}>© 2024 Bona Beetle Lab • 轉化常數: {EFF_CONSTANT} mm/g</p>
                             </div>
                         </div>
                     )}
