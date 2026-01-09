@@ -1,369 +1,407 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>BONA BEETLE | PGK Formosa Apex 建議系統</title>
+import React, { useState, useMemo } from 'react';
+
+const App = () => {
+  // --- 全域核心配置 ---
+  const brandName = "BONA BEETLE";
+  const MODEL_NAME = "BONA PGK INDEX"; 
+  const WORLD_RECORD = 122.5;
+  const PGK_MAX_WEIGHT = 58.5; 
+  const GOLDEN_DAYS = 520;      
+  const MAX_AXIS_DAYS = 800;    // 日齡軸線：800 天
+  const MAX_AXIS_WEIGHT = 80;   // 重量軸線：80g (確保高體重標籤不被遮擋)
+  const logoSource = "https://atom-bunny-8f6.notion.site/image/attachment%3A3a5ee000-88a9-42c5-842f-34619d1099fc%3ABEETLE_LOGO.jpg?table=block&id=2df51f87-ec7c-80fe-a0ef-f3054ac7e61e&spaceId=c7751f87-ec7c-818c-8570-00032fe627bd&width=1420&userId=&cache=v2";
+  const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/amg1tvqnbhch5cjnlh6ue57473ehlstc";
+
+  // --- 狀態管理 ---
+  const [view, setView] = useState('input'); 
+  const [mode, setMode] = useState('larva'); 
+  const [activeTab, setActiveTab] = useState('summary');
+  const [showModal, setShowModal] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [contact, setContact] = useState('');
+  
+  const [formData, setFormData] = useState({ 
+    id: '', weight: '', hatch: '', check: new Date().toISOString().split('T')[0], sub: 'plus_b' 
+  });
+  const [report, setReport] = useState(null);
+
+  // --- 核心對標引擎 ---
+  const runBonaEngine = (w, days, substrate, isPupa) => {
+    let estFinalWeight = w;
+    let targetPupaWeight = w;
+    let advices = [];
+    let isForecast = !isPupa;
+
+    // 1. 生理數據模擬 (雙軌)
+    if (isForecast) {
+      if (days < 400) {
+        const dailyRate = w / days;
+        const remainingDays = GOLDEN_DAYS - days;
+        const saturationFactor = (PGK_MAX_WEIGHT - w) / PGK_MAX_WEIGHT;
+        estFinalWeight = w + (dailyRate * remainingDays * saturationFactor * 0.65);
+        estFinalWeight = Math.min(estFinalWeight, PGK_MAX_WEIGHT);
+        targetPupaWeight = estFinalWeight * 0.62; 
+      } else {
+        estFinalWeight = w;
+        targetPupaWeight = w * 0.62;
+      }
+    } else {
+      targetPupaWeight = w;
+      estFinalWeight = w / 0.62; 
+    }
+
+    // 2. 轉化效率計算 (對標真實數據錨點)
+    let baseEff = 0;
+    if (targetPupaWeight <= 20) baseEff = 4.75; 
+    else if (targetPupaWeight >= 34) baseEff = 3.29; 
+    else {
+      const slope = (3.29 - 4.75) / (34 - 20);
+      baseEff = 4.75 + (targetPupaWeight - 20) * slope;
+    }
+
+    if (substrate === 'plus_b') baseEff *= 1.025;
+    if (substrate === 'sawdust') baseEff *= 0.97;
+
+    let timeFactor = 1.0;
+    if (days >= 500) timeFactor = 1.03;
+    if (days < 300 && estFinalWeight > 25) timeFactor = 0.94;
+
+    const finalEff = baseEff * timeFactor;
+    let meanSize = targetPupaWeight * finalEff;
+
+    if (meanSize > 115) meanSize = 115 + (meanSize - 115) * 0.35;
+    const finalMean = Math.min(meanSize, WORLD_RECORD + 0.5);
+
+    const tolerance = isForecast ? 0.02 : 0.012; 
+    const minVal = (finalMean * (1 - tolerance)).toFixed(1);
+    const maxVal = (finalMean * (1 + tolerance)).toFixed(1);
+
+    const dailySlope = (w / days).toFixed(3);
+    if (substrate === 'plus_b') advices.push("已啟動登大蟲 (+B) 強化轉化路徑。");
     
-    <!-- 核心資源載入 -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700;900&display=swap');
-        
-        :root {
-            --bona-gold: #CA8A04;
-            --bona-black: #050505;
-            --bona-zinc: #18181B;
-        }
+    if (isForecast) {
+      if (finalMean < 90) advices.push("個體目前體量較低，預計為精肉型發育，建議加強營養。");
+      else if (finalMean > 112 && dailySlope > 0.08) advices.push("成長斜率極佳，完美對標 120mm+ 黃金軌跡。");
+      else advices.push("發育數據穩健，請維持 22.5°C 恆溫直至熟化高原期。");
+    } else {
+      if (w < 25) advices.push("精肉型鑑定：大顎拉伸效率預計極高。");
+      if (w > 33) advices.push("飽和型鑑定：組織密度紮實，有望挑戰紀錄級尺寸。");
+    }
 
-        body { 
-            font-family: 'Noto Sans TC', sans-serif; 
-            background-color: var(--bona-black); 
-            margin: 0; 
-            color: #E2E8F0;
-            overflow-x: hidden;
-        }
+    const bpiScore = ((finalMean / 122.5) * 100).toFixed(1);
 
-        .bg-grid {
-            position: fixed; inset: 0; z-index: -1;
-            background-size: 32px 32px;
-            background-image: linear-gradient(to right, rgba(202, 138, 4, 0.05) 1px, transparent 1px),
-                              linear-gradient(to bottom, rgba(202, 138, 4, 0.05) 1px, transparent 1px);
-        }
+    return {
+      typeLabel: MODEL_NAME,
+      isForecast,
+      estFinalWeight: estFinalWeight.toFixed(1),
+      mean: finalMean.toFixed(1),
+      range: `${minVal} ~ ${maxVal}`,
+      eff: finalEff.toFixed(2),
+      shrink: isForecast ? "38.2% (預估)" : `${((1 - targetPupaWeight/(estFinalWeight)) * 100).toFixed(1)}%`,
+      bpiScore,
+      status: finalMean > 118 ? "紀錄挑戰級" : (finalMean > 110 ? "高端精品" : "標準發育"),
+      advices
+    };
+  };
 
-        /* ============================================================
-           🚀 【V6.35 終極 A4 單頁列印引擎】
-           ============================================================ */
-        
-        .print-only-cert { display: none; }
+  const handleAnalyze = (e) => {
+    e.preventDefault();
+    setView('loading');
+    const h = new Date(formData.hatch);
+    const c = new Date(formData.check);
+    const d = Math.max(1, Math.floor((c - h) / (1000 * 60 * 60 * 24)));
+    const w = parseFloat(formData.weight) || 0;
+    const res = runBonaEngine(w, d, formData.sub, mode === 'pupa');
+    setTimeout(() => {
+      setReport({ ...formData, ...res, days: d, rawWeight: w });
+      setView('report');
+      setActiveTab('summary');
+    }, 1500);
+  };
 
-        @media print {
-            @page { size: A4; margin: 0; }
-            html, body { 
-                background: white !important; 
-                background-color: white !important;
-                color: black !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                height: 100vh;
-                overflow: hidden !important; 
-            }
-            #web-view-ui, .no-print, .bg-grid { display: none !important; }
-            .print-only-cert { 
-                display: block !important; 
-                background: white !important;
-                color: black !important;
-                padding: 20px !important; 
-                width: 210mm;
-                height: 297mm;
-                box-sizing: border-box;
-                position: relative !important;
-            }
-            .cert-border { 
-                border: 4px solid #CA8A04 !important; 
-                padding: 25px !important;
-                height: 100% !important;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-            }
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .cert-gold-text { color: #CA8A04 !important; font-weight: 900 !important; }
-            .cert-bg-gray { background-color: #f5f5f5 !important; border: 1px solid #ddd !important; }
-            .print-chart-box {
-                margin: 10px 0;
-                height: 240px; 
-                border: 1px solid #eee;
-                background: #fff;
-                border-radius: 12px;
-                padding: 15px;
-                display: block !important;
-            }
-        }
+  const submitLead = async (e) => {
+    e.preventDefault();
+    setIsSending(true);
+    try {
+      await fetch(MAKE_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          contact, 
+          report_id: report.id,
+          model: MODEL_NAME,
+          data: report,
+          timestamp: new Date().toISOString()
+        })
+      });
+    } catch (err) { console.error(err); }
+    setIsSending(false);
+    setShowModal(false);
+    setTimeout(() => window.print(), 500);
+  };
 
-        .animate-fade-up { animation: fadeUp 0.6s ease-out forwards; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  if (view === 'input') return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="bg-grid absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(to right, #CA8A04 1px, transparent 1px), linear-gradient(to bottom, #CA8A04 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      <div className="w-full max-w-md bg-[#18181B] border border-white/5 p-10 rounded-[2.5rem] shadow-2xl animate-fade-up relative z-10 text-left">
+        <header className="text-center mb-10">
+          <img src={logoSource} className="w-20 h-20 border border-[#CA8A04] p-1 mx-auto mb-6 bg-black shadow-lg" />
+          <h1 className="text-3xl font-black text-white italic tracking-tighter uppercase leading-none">{MODEL_NAME}</h1>
+          <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-2">Professional Breeding Engine</p>
+          <div className="flex gap-2 justify-center mt-6">
+            <button type="button" onClick={()=>setMode('larva')} className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'larva' ? 'bg-[#CA8A04] text-black shadow-lg shadow-yellow-900/20' : 'bg-zinc-900 text-gray-500'}`}>幼蟲預報</button>
+            <button type="button" onClick={()=>setMode('pupa')} className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'pupa' ? 'bg-[#CA8A04] text-black shadow-lg shadow-yellow-900/20' : 'bg-zinc-900 text-gray-500'}`}>蛹重鑑定</button>
+          </div>
+        </header>
 
-        input {
-            background: rgba(24, 24, 27, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            padding: 1rem;
-            border-radius: 1rem;
-            outline: none;
-            transition: all 0.3s;
-        }
-        input:focus { border-color: #CA8A04; box-shadow: 0 0 15px rgba(202, 138, 4, 0.2); }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+        <form onSubmit={handleAnalyze} className="space-y-6">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-[#CA8A04] font-black uppercase tracking-widest ml-1">個體識別標籤 ID</label>
+            <input required placeholder="PGK-APEX-XXX" value={formData.id} onChange={e=>setFormData({...formData, id: e.target.value})} className="bg-black/40 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#CA8A04]" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-gray-500 font-bold uppercase ml-1">挖出日期</label>
+              <input type="date" required value={formData.hatch} onChange={e=>setFormData({...formData, hatch: e.target.value})} className="bg-black/40 border border-white/10 p-4 rounded-xl text-xs text-white" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-gray-500 font-bold uppercase ml-1">{mode === 'pupa' ? '化蛹日期' : '量測日期'}</label>
+              <input type="date" required value={formData.check} onChange={e=>setFormData({...formData, check: e.target.value})} className="bg-black/40 border border-white/10 p-4 rounded-xl text-xs text-white" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1 text-center">
+            <label className="text-[10px] text-[#CA8A04] font-black uppercase tracking-widest">{mode === 'pupa' ? '精確蛹重 (G)' : '當前體重 (G)'}</label>
+            <input type="number" step="0.01" required placeholder="0.00" value={formData.weight} onChange={e=>setFormData({...formData, weight: e.target.value})} className="bg-black/50 border border-white/10 p-5 rounded-xl text-center text-5xl font-black text-white outline-none focus:border-[#CA8A04]" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] text-gray-500 font-bold uppercase ml-1 tracking-widest">飼育環境基質</label>
+            <div className="flex gap-2">
+              {[ {id:'sawdust', l:'純木屑'}, {id:'fungus', l:'菌瓶'}, {id:'plus_b', l:'木屑+B'} ].map(s => (
+                <button key={s.id} type="button" onClick={()=>setFormData({...formData, sub: s.id})} className={`flex-1 py-4 rounded-xl text-[9px] font-black transition-all ${formData.sub === s.id ? 'bg-[#CA8A04] text-black shadow-lg shadow-yellow-900/20' : 'bg-zinc-900 text-gray-500 border border-white/5'}`}>
+                  {s.l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-[#CA8A04] text-black font-black py-5 rounded-2xl text-xs uppercase tracking-widest shadow-xl mt-4 active:scale-95 transition-all">
+            啟動大數據精確對標
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+  if (view === 'loading') return (
+    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6">
+      <div className="w-16 h-16 border-4 border-zinc-900 border-t-[#CA8A04] rounded-full animate-spin mb-8"></div>
+      <p className="text-[10px] text-[#CA8A04] font-mono tracking-[0.5em] animate-pulse uppercase tracking-[0.2em]">CALIBRATING_PGK_INDEX</p>
+    </div>
+  );
 
-        // --- 全域核心配置 ---
-        const BRAND_NAME = "BONA BEETLE";
-        const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/amg1tvqnbhch5cjnlh6ue57473ehlstc"; 
-        const LOGO_FILENAME = "./logo.png";
-        const EFF_CONSTANT = 3.48;
-        const MAX_DAYS = 700;
-        const MAX_WEIGHT = 75;
+  return (
+    <div className="min-h-screen bg-[#050505] p-4 md:p-10 flex flex-col items-center relative text-left">
+      <div id="web-view-ui" className="w-full max-w-2xl bg-[#18181B] border border-[#CA8A04]/30 rounded-[2.5rem] overflow-hidden shadow-2xl relative no-print">
+        {showModal && (
+          <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 no-print">
+            <div className="w-full max-w-sm bg-[#18181B] border border-[#CA8A04] p-10 rounded-[2.5rem] shadow-2xl text-center space-y-6 animate-fade-up">
+              <div className="text-4xl text-center">📕</div>
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter text-center">{brandName} 數據領取</h3>
+              <p className="text-xs text-gray-400 px-4 leading-relaxed font-medium text-center">請輸入聯絡資訊，系統將自動下載測試報告 PDF 並領取《PGK 飼育筆記電子書》。</p>
+              <form onSubmit={submitLead} className="space-y-4">
+                <input required placeholder="輸入您的 Email 或 Line ID" value={contact} onChange={e=>setContact(e.target.value)} className="w-full bg-black border border-white/10 p-4 rounded-xl text-white text-center outline-none focus:border-[#CA8A04]" />
+                <button type="submit" disabled={isSending} className="w-full bg-[#CA8A04] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg active:scale-95">
+                  下載報告並領取電子書
+                </button>
+                <button type="button" onClick={()=>setShowModal(false)} className="text-[10px] text-gray-600 font-black uppercase py-2 block w-full text-center">返回報告</button>
+              </form>
+            </div>
+          </div>
+        )}
 
-        const App = () => {
-            const [view, setView] = useState('input'); 
-            const [activeTab, setActiveTab] = useState('summary');
-            const [showModal, setShowModal] = useState(false);
-            const [isSending, setIsSending] = useState(false);
-            const [contact, setContact] = useState('');
-            const [logoError, setLogoError] = useState(false);
-            const [formData, setFormData] = useState({ id: '', w: '', hatch: '', check: new Date().toISOString().split('T')[0], sub: '木屑' });
-            const [report, setReport] = useState(null);
+        <header className="p-8 border-b border-white/5 flex justify-between items-center bg-black/40">
+          <div className="flex items-center gap-4">
+            <img src={logoSource} className="w-12 h-12 border border-[#CA8A04] p-1 bg-black shadow-lg" />
+            <div>
+              <h1 className="text-xl font-black text-white italic leading-none">{MODEL_NAME}</h1>
+              <p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase">Apex Diagnostic Portal</p>
+            </div>
+          </div>
+          <div className="text-right text-xs font-mono font-black text-[#CA8A04]">#{report.id}</div>
+        </header>
 
-            const BASELINE = [ { x: 0, y: 0 }, { x: 150, y: 25 }, { x: 280, y: 46 }, { x: 440, y: 49 }, { x: 560, y: 37 } ];
+        <nav className="flex bg-black/30 p-2 border-b border-white/5">
+          {[ {id:'summary', l:'對標預估'}, {id:'advice', l:'診斷建議'} ].map(t => (
+            <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === t.id ? 'bg-[#CA8A04] text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              {t.l}
+            </button>
+          ))}
+        </nav>
 
-            const handleAnalyze = (e) => {
-                e.preventDefault();
-                setView('loading');
-                const w = parseFloat(formData.w);
-                const days = Math.max(1, Math.floor((new Date(formData.check) - new Date(formData.hatch)) / (1000 * 60 * 60 * 24)));
-                
-                let status = "優良 (Elite)";
-                let advice = "成長斜率驚人，個體正處於穩定的熟化期。建議鎖定溫控節奏，以最大化大顎角質密度。";
-                if (w < 45) {
-                    status = "發育偏緩";
-                    advice = "偵測到轉換效率偏低。目前個體位點低於黃金基準線，建議適度添加「登大蟲」優化下一階段的骨架轉化效能。";
-                }
-
-                setTimeout(() => {
-                    setReport({ ...formData, weight: w, days, potential: (w * 2.15).toFixed(1), status, advice });
-                    setView('report');
-                }, 1000);
-            };
-
-            const submitLeadAndPrint = async (e) => {
-                e.preventDefault();
-                setIsSending(true);
-                if (MAKE_WEBHOOK_URL) {
-                    try {
-                        await fetch(MAKE_WEBHOOK_URL, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ 
-                                contact: contact, 
-                                specimen_id: report.id, 
-                                weight: report.weight, 
-                                hatch_date: report.hatch,
-                                check_date: report.check,
-                                days: report.days,
-                                potential_size: report.potential,
-                                reward: "PGK_ANALYSIS_HANDBOOK", // 標記為索取手冊
-                                timestamp: new Date().toISOString() 
-                            })
-                        });
-                    } catch (err) { console.error(err); }
-                }
-                setIsSending(false);
-                setShowModal(false);
-                setTimeout(() => window.print(), 800);
-            };
-
-            const LogoIcon = ({ className }) => {
-                if (!logoError) return <img src={LOGO_FILENAME} className={`${className} object-contain`} onError={() => setLogoError(true)} alt="Logo" />;
-                return <div className={`${className} bg-gradient-to-br from-[#CA8A04] to-[#855B02] rounded-xl flex items-center justify-center shadow-lg border border-yellow-500/50 text-black font-black text-2xl`}>B</div>;
-            };
-
-            const getX = (d) => (d / MAX_DAYS) * 100; 
-            const getY = (w) => 100 - (w / MAX_WEIGHT) * 100;
-
-            if (view === 'input') return (
-                <div className="min-h-screen flex items-center justify-center p-6 text-left relative">
-                    <div className="bg-grid"></div>
-                    <div className="w-full max-w-md bg-[#18181B] border border-white/5 p-10 rounded-[2.5rem] shadow-2xl animate-fade-up">
-                        <header className="text-center mb-10">
-                            <LogoIcon className="w-20 h-20 mx-auto mb-6 p-0.5 bg-black rounded-xl border border-[#CA8A04]" />
-                            <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter" style={{ textShadow: '0 0 12px rgba(202, 138, 4, 0.4)' }}>
-                                BONA <span className="text-[#CA8A04]">BEETLE</span>
-                            </h1>
-                            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-1">PGK Formosa Apex 建議系統</p>
-                        </header>
-                        <form onSubmit={handleAnalyze} className="space-y-6 flex flex-col text-left">
-                            <input required placeholder="個體編號 (如: PGK-01)" value={formData.id} onChange={e=>setFormData({...formData, id: e.target.value})} className="w-full" />
-                            <div className="grid grid-cols-2 gap-4 text-left">
-                                <div className="space-y-1">
-                                    <label className="text-[9px] text-gray-500 font-bold uppercase ml-1">挖出日期</label>
-                                    <input type="date" required value={formData.hatch} onChange={e=>setFormData({...formData, hatch: e.target.value})} className="text-xs w-full" />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[9px] text-gray-500 font-bold uppercase ml-1">今日日期</label>
-                                    <input type="date" required value={formData.check} onChange={e=>setFormData({...formData, check: e.target.value})} className="text-xs w-full" />
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-1 text-center">
-                                <label className="text-[10px] text-[#CA8A04] font-black uppercase tracking-widest">目前重量 (g)</label>
-                                <input type="number" step="0.1" required placeholder="0.0" value={formData.w} onChange={e=>setFormData({...formData, w: e.target.value})} className="text-center text-4xl font-black text-white" />
-                            </div>
-                            <div className="flex gap-2">
-                                {['木屑', '菌'].map(s => <button key={s} type="button" onClick={()=>setFormData({...formData, sub: s})} className={`flex-1 py-4 rounded-xl text-xs font-black transition-all ${formData.sub === s ? 'bg-[#CA8A04] text-black shadow-lg shadow-yellow-900/20' : 'bg-zinc-900 text-gray-500'}`}>{s}</button>)}
-                            </div>
-                            <button type="submit" className="w-full bg-[#CA8A04] text-black font-black py-5 rounded-2xl text-sm uppercase tracking-widest shadow-xl mt-4 active:scale-95 transition-all">啟動數據診斷</button>
-                        </form>
-                    </div>
+        <main className="p-8 md:p-10 min-h-[500px]">
+          {activeTab === 'summary' && (
+            <div className="space-y-12 animate-fade-up">
+              <div className="text-center space-y-4">
+                <h2 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">Predicted Size Range</h2>
+                <div className="text-4xl md:text-5xl font-black text-white/60 tracking-tighter mb-4 tabular-nums italic">
+                  {report.range} <span className="text-sm">mm</span>
                 </div>
-            );
+                {/* 顯眼的期望平均值 */}
+                <div className="bg-[#CA8A04]/10 border border-[#CA8A04]/40 py-8 px-12 rounded-[2.5rem] inline-block shadow-[0_0_50px_rgba(202,138,4,0.15)] relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-[#CA8A04]/5 animate-pulse"></div>
+                   <p className="text-[11px] text-[#CA8A04] font-black uppercase tracking-[0.3em] mb-3 relative z-10">Mean Potential Expectation</p>
+                   <p className="text-7xl md:text-8xl font-black text-[#CA8A04] gold-glow leading-none relative z-10 tabular-nums">
+                     {report.mean} <span className="text-2xl ml-[-10px]">mm</span>
+                   </p>
+                </div>
+              </div>
 
-            if (view === 'loading') return <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505]"><div className="w-16 h-16 border-4 border-zinc-900 border-t-[#CA8A04] rounded-full animate-spin mb-8"></div><p className="text-[11px] text-[#CA8A04] font-mono tracking-[0.5em] animate-pulse uppercase text-center">Syncing_Bona_Engine</p></div>;
-
-            return (
-                <div className="min-h-screen p-4 md:p-10 flex flex-col items-center text-left relative">
-                    <div className="bg-grid"></div>
+              {/* 幼蟲模式：優化全景視覺圖 */}
+              {report.isForecast && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-end">
+                    <h3 className="text-xs font-bold text-white uppercase tracking-widest">成長軌跡對標 (Full Trajectory)</h3>
+                    <span className="text-[9px] text-gray-600 font-mono uppercase italic">Max Axis: 800d / 80g</span>
+                  </div>
+                  <div className="h-72 w-full border-l border-b border-zinc-800 relative flex items-end overflow-hidden bg-black/40 rounded-[2rem] p-4">
+                    {/* Y 軸刻度 */}
+                    <div className="absolute left-2 top-0 h-full flex flex-col justify-between py-6 pointer-events-none opacity-20">
+                       {[80, 60, 40, 20, 0].map(v => <div key={v} className="text-[8px] text-zinc-400 font-mono">{v}g</div>)}
+                    </div>
+                    {/* X 軸刻度 */}
+                    <div className="absolute left-0 bottom-1 w-full flex justify-between px-10 pointer-events-none opacity-20">
+                       {[0, 200, 400, 600, 800].map(v => <span key={v} className="text-[8px] text-zinc-400 font-mono">{v}d</span>)}
+                    </div>
                     
-                    {/* 網頁 UI */}
-                    <div id="web-view-ui" className="w-full max-w-2xl animate-fade-up">
-                        {showModal && (
-                            <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 no-print">
-                                <div className="w-full max-w-sm bg-[#18181B] border border-[#CA8A04] p-10 rounded-[2.5rem] shadow-2xl text-center space-y-6 animate-fade-up">
-                                    <div className="text-4xl">📜</div>
-                                    <h3 className="text-xl font-black text-white uppercase leading-none">{BRAND_NAME}<br/><span className="text-[#CA8A04] text-sm tracking-widest">高清建議書 & 飼育手冊</span></h3>
-                                    <p className="text-xs text-gray-400 px-4 leading-relaxed">輸入聯絡資訊（Email 或 Line），系統將下載高清建議書，並加碼贈送《PGK 巔峰飼育分析手冊》。</p>
-                                    <form onSubmit={submitLeadAndPrint} className="space-y-4 flex flex-col">
-                                        <input required placeholder="輸入您的聯絡資訊" value={contact} onChange={e=>setContact(e.target.value)} className="w-full bg-black border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#CA8A04] text-center" />
-                                        <button type="submit" disabled={isSending} className="w-full bg-[#CA8A04] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg active:scale-95">
-                                            解鎖PDF與飼育手冊
-                                        </button>
-                                        <button type="button" onClick={()=>setShowModal(false)} className="text-[10px] text-gray-600 font-black uppercase py-2 text-center block w-full">返回報告</button>
-                                    </form>
-                                </div>
-                            </div>
-                        )}
+                    <svg className="absolute inset-0 w-full h-full p-10 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                      {/* 黃金對標基準線 (虛線) */}
+                      <path d="M0,95 Q30,85 85,25" fill="none" stroke="#27272A" strokeWidth="1" strokeDasharray="3" />
+                      
+                      {/* 當前座標 */}
+                      <circle cx={(report.days/MAX_AXIS_DAYS)*100} cy={100 - (report.rawWeight/MAX_AXIS_WEIGHT)*100} r="3.5" fill="#CA8A04" />
+                      <g className="animate-pulse">
+                        <text x={(report.days/MAX_AXIS_DAYS)*100} y={100 - (report.rawWeight/MAX_AXIS_WEIGHT)*100 - 8} fill="#CA8A04" fontSize="5" textAnchor="middle" fontWeight="black">NOW ({report.rawWeight}g)</text>
+                      </g>
 
-                        <div className="bg-[#18181B] border border-[#CA8A04]/40 rounded-[2.5rem] shadow-2xl overflow-hidden relative no-print">
-                            <header className="p-8 border-b border-white/5 flex justify-between items-center bg-black/40">
-                                <div className="flex items-center gap-4 text-left font-bold"><LogoIcon className="w-14 h-14" /><div className="text-left"><h1 className="text-xl font-black text-white uppercase italic leading-none">{BRAND_NAME}</h1><p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase font-bold text-left">PGK Formosa Apex Report</p></div></div>
-                                <div className="text-right text-xs font-mono font-black text-[#CA8A04]">#{report.id}</div>
-                            </header>
-                            <nav className="flex bg-black/30 p-2 border-b border-white/5">
-                                {[ {id:'summary', label:'數據概覽'}, {id:'path', label:'模型對標'}, {id:'advice', label:'專家建議'} ].map(t => (
-                                    <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === t.id ? 'bg-[#CA8A04] text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>{t.label}</button>
-                                ))}
-                            </nav>
-                            <main className="p-8 md:p-12 min-h-[400px]">
-                                {activeTab === 'summary' && (
-                                    <div className="space-y-12 animate-fade-up text-left">
-                                        <div className="flex justify-between items-end gap-6 text-left font-bold">
-                                            <div className="text-left"><h2 className="text-[10px] font-black text-[#CA8A04] uppercase border-l-4 border-[#CA8A04] pl-3 mb-4 font-bold tracking-widest">Weight Snapshot</h2><div className="text-8xl font-black text-white tracking-tighter inline-block relative">{report.weight}<span className="text-sm text-[#CA8A04] absolute -right-8 bottom-4 font-mono font-bold text-left font-bold">g</span></div></div>
-                                            <div className="text-right pb-2 text-right"><div className="text-[10px] text-gray-600 uppercase font-bold mb-1 tracking-widest">量測日齡</div><div className="text-2xl font-black text-white font-mono leading-none">{report.days} <span className="text-xs text-[#CA8A04] font-bold uppercase text-right">Days</span></div></div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 font-bold text-left">
-                                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left"><div className="text-[9px] text-gray-600 uppercase font-black mb-2">鑑定評級</div><div className={`text-sm font-black uppercase text-[#CA8A04]`}>● {report.status}</div></div>
-                                            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left"><div className="text-[9px] text-gray-600 uppercase font-black mb-2">當前食材</div><div className="text-sm font-black text-white uppercase">{report.sub} (PRO)</div></div>
-                                        </div>
-                                        <div className="p-6 bg-[#CA8A04]/5 rounded-3xl border border-[#CA8A04]/20 text-center"><p className="text-xs text-[#CA8A04] font-bold italic text-left italic">「預估羽化潛力尺寸約為 <span className="text-white font-black text-lg underline">{report.potential} mm</span>。」</p></div>
-                                    </div>
-                                )}
-                                {activeTab === 'path' && (
-                                    <div className="space-y-10 animate-fade-up text-left font-bold">
-                                        <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 text-left"><span className="w-2 h-2 bg-[#CA8A04] rounded-full animate-pulse text-left"></span>全台 PGK 巔峰對標空間</h3>
-                                        <div className="h-72 w-full border-l border-b border-zinc-800 relative flex items-end px-4 overflow-hidden bg-black/60 rounded-2xl">
-                                            <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
-                                                <path d={`M ${BASELINE.map(p => `${getX(p.x)},${getY(p.y)}`).join(' L ')}`} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="3" />
-                                                <circle cx={getX(report.days)} cy={getY(report.weight)} r="4" fill="#CA8A04" />
-                                                <text x={getX(report.days)} y={getY(report.weight)-15} fill="#CA8A04" fontSize="5" textAnchor="middle" fontWeight="black" className="italic">{report.weight}g</text>
-                                            </svg>
-                                        </div>
-                                        <div className="p-5 bg-zinc-900 rounded-2xl border border-white/5 flex justify-between items-center"><span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">對標轉化常數</span><span className="text-sm font-black text-[#CA8A04]">{EFF_CONSTANT} mm/g</span></div>
-                                    </div>
-                                )}
-                                {activeTab === 'advice' && (
-                                    <div className="space-y-8 animate-fade-up text-left">
-                                        <div className="bg-white text-black p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-                                            <div className="flex gap-6 items-start relative z-10 text-left"><div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center text-[#CA8A04] text-2xl shrink-0 text-center">🧠</div><div className="space-y-3 flex-1 text-left"><p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em]">AI 繁育導師建議</p><p className="text-sm text-black leading-relaxed font-bold italic">「{report.advice}」</p></div></div>
-                                        </div>
-                                        <button onClick={()=>setShowModal(true)} className="w-full bg-[#CA8A04] text-black font-black py-6 rounded-3xl text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-yellow-500 transition-all text-center font-bold">
-                                            下載PDF並索取PGK飼育分析手冊
-                                        </button>
-                                    </div>
-                                )}
-                            </main>
-                        </div>
-                        <button onClick={()=>setView('input')} className="mt-8 text-[10px] text-gray-800 font-black uppercase tracking-[0.4em] hover:text-[#CA8A04] transition-all no-print mx-auto block font-bold">← 返回重新錄入 (RESET)</button>
-                    </div>
-
-                    {/* 【列印專用沙盒】V6.35 強化顯影 + 曲線同步 */}
-                    {report && (
-                        <div className="print-only-cert cert-border">
-                            {/* 證書頁眉 */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #CA8A04', paddingBottom: '15px', marginBottom: '20px' }}>
-                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                    <div style={{ background: 'black', color: '#CA8A04', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '26px', borderRadius: '8px' }}>B</div>
-                                    <div>
-                                        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '900' }}>{BRAND_NAME} <span className="cert-gold-text">SYSTEMS</span></h1>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#666', letterSpacing: '3px', fontWeight: 'bold', textTransform: 'uppercase' }}>PGK FORMOSA APEX OFFICIAL CERTIFICATE</p>
-                                    </div>
-                                 </div>
-                                 <div style={{ textAlign: 'right' }}>
-                                    <p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>鑑定編號 ID</p>
-                                    <p style={{ margin: 0, fontSize: '16px', fontWeight: '900', color: '#CA8A04' }}>#{report.id}</p>
-                                 </div>
-                            </div>
-
-                            {/* 數據摘要 */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <h2 style={{ fontSize: '12px', color: '#CA8A04', fontWeight: '900', textTransform: 'uppercase', marginBottom: '10px', borderLeft: '4px solid #CA8A04', paddingLeft: '10px' }}>數據紀錄概覽 / Summary</h2>
-                                <div style={{ display: 'flex', gap: '50px' }}>
-                                    <div><p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>實測體重</p><p style={{ margin: 0, fontSize: '46px', fontWeight: '900' }}>{report.weight}<span style={{ fontSize: '16px', color: '#CA8A04', marginLeft: '3px' }}>g</span></p></div>
-                                    <div><p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>量測日齡</p><p style={{ margin: 0, fontSize: '46px', fontWeight: '900' }}>{report.days}<span style={{ fontSize: '16px', color: '#CA8A04', marginLeft: '3px' }}>Days</span></p></div>
-                                    <div style={{ marginLeft: 'auto', textAlign: 'right' }}><p style={{ margin: 0, fontSize: '9px', color: '#999', fontWeight: 'bold' }}>預測羽化尺寸</p><p style={{ margin: 0, fontSize: '46px', fontWeight: '900', color: '#CA8A04' }}>{report.potential}<span style={{ fontSize: '16px', color: '#000', marginLeft: '3px' }}>mm</span></p></div>
-                                </div>
-                            </div>
-
-                            {/* 列印圖表 */}
-                            <div className="print-chart-box">
-                                <p style={{ margin: '0 0 8px 0', fontSize: '10px', fontWeight: '900', color: '#333', textTransform: 'uppercase' }}>生長軌跡對標 / Growth Trajectory</p>
-                                <div style={{ height: '180px', width: '100%', borderLeft: '2px solid #ddd', borderBottom: '2px solid #ddd', position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
-                                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
-                                        <line x1="0" y1="25" x2="100" y2="25" stroke="#f0f0f0" strokeWidth="0.5" />
-                                        <line x1="0" y1="50" x2="100" y2="50" stroke="#f0f0f0" strokeWidth="0.5" />
-                                        <line x1="0" y1="75" x2="100" y2="75" stroke="#f0f0f0" strokeWidth="0.5" />
-                                        <path d={`M ${BASELINE.map(p => `${getX(p.x)},${getY(p.y)}`).join(' L ')}`} fill="none" stroke="#ccc" strokeWidth="1.5" strokeDasharray="3" />
-                                        <circle cx={getX(report.days)} cy={getY(report.weight)} r="4" fill="#CA8A04" stroke="black" strokeWidth="0.5" />
-                                        <text x={getX(report.days)} y={getY(report.weight)-12} fill="#CA8A04" fontSize="5" textAnchor="middle" fontWeight="900" fontStyle="italic">{report.weight}g</text>
-                                    </svg>
-                                    <div style={{ position: 'absolute', bottom: '-15px', right: '0', fontSize: '8px', color: '#999', fontWeight: 'bold' }}>Scale: {MAX_DAYS}D / {MAX_WEIGHT}g</div>
-                                </div>
-                            </div>
-
-                            {/* AI 建議區 */}
-                            <div className="cert-bg-gray" style={{ padding: '25px', borderRadius: '15px', marginTop: 'auto', marginBottom: '15px' }}>
-                                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
-                                    <div style={{ fontSize: '30px' }}>🧠</div>
-                                    <div style={{ textAlign: 'left' }}>
-                                        <p style={{ margin: '0 0 5px 0', fontSize: '11px', fontWeight: '900', color: '#CA8A04', textTransform: 'uppercase' }}>Bona AI 專家診斷建議結論</p>
-                                        <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', fontWeight: '700', fontStyle: 'italic' }}>「{report.advice}」</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 頁尾 */}
-                            <div style={{ borderTop: '1px solid #EEE', paddingTop: '15px', textAlign: 'center' }}>
-                                <p style={{ fontSize: '9px', color: '#999', letterSpacing: '2px', fontWeight: 'bold' }}>
-                                    本認證書由 Bona Beetle Systems AI 數據引擎分析生成 • Verified Scientific Data
-                                </p>
-                                <p style={{ fontSize: '7px', color: '#BBB', marginTop: '5px' }}>© 2024 Bona Beetle Lab • 轉化常數基準: {EFF_CONSTANT} mm/g</p>
-                            </div>
-                        </div>
-                    )}
+                      {/* 目標預報點 */}
+                      <circle cx={(GOLDEN_DAYS/MAX_AXIS_DAYS)*100} cy={100 - (report.estFinalWeight/MAX_AXIS_WEIGHT)*100} r="4.5" fill="white" />
+                      <text x={(GOLDEN_DAYS/MAX_AXIS_DAYS)*100} y={100 - (report.estFinalWeight/MAX_AXIS_WEIGHT)*100 - 8} fill="white" fontSize="5" textAnchor="middle" fontWeight="black">TARGET (520d)</text>
+                    </svg>
+                  </div>
                 </div>
-            );
-        };
+              )}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+              {/* BONA PGK INDEX 核心看板 */}
+              <div className="grid grid-cols-3 gap-4">
+                 {[
+                   { label: "轉化效率", val: report.eff, sub: "C-eff", color: "text-[#CA8A04]" },
+                   { label: "生理縮水", val: report.shrink, sub: "S-rate", color: "text-white" },
+                   { label: "PGK 指數", val: report.bpiScore, sub: "BPI", color: "text-white" }
+                 ].map((idx, i) => (
+                   <div key={i} className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
+                     <div className="text-[8px] text-gray-600 uppercase font-black mb-1 tracking-widest">{idx.label}</div>
+                     <div className={`text-xl font-black font-mono ${idx.color}`}>{idx.val}</div>
+                     <div className="text-[8px] text-gray-800 font-mono uppercase mt-1 opacity-50">{idx.sub}</div>
+                   </div>
+                 ))}
+              </div>
+
+              {!report.isForecast && (
+                <div className="p-5 bg-white/5 rounded-3xl border border-white/10 text-center">
+                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                    鑑定評級：<span className="text-white">{report.status}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'advice' && (
+            <div className="space-y-8 animate-fade-up">
+              <div className="bg-white text-black p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                <div className="flex gap-6 items-start relative z-10 text-left">
+                  <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center text-[#CA8A04] text-2xl shrink-0 font-black shadow-xl italic font-black underline decoration-[#CA8A04]">B</div>
+                  <div className="space-y-4 flex-1">
+                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em]">Bona AI 專家核心診斷建議</p>
+                    <div className="space-y-4">
+                      {report.advices.map((adv, idx) => (
+                        <p key={idx} className="text-sm text-black leading-relaxed font-bold italic border-l-2 border-[#CA8A04] pl-4">「{adv}」</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button onClick={()=>setShowModal(true)} className="w-full bg-[#CA8A04] text-black font-black py-6 rounded-3xl text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-yellow-500 transition-all font-bold text-center">
+                下載報告 PDF 並領取電子書
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      <button onClick={()=>setView('input')} className="mt-8 text-[10px] text-gray-500 font-black uppercase tracking-[0.4em] hover:text-[#CA8A04] transition-all no-print mx-auto block text-center underline font-bold tracking-[0.3em]">← 返回錄入主畫面 (RESET)</button>
+
+      {/* 列印證書模板 */}
+      {report && (
+        <div className="hidden print:block fixed inset-0 bg-white text-black p-10 w-[210mm] h-[297mm]">
+          <div className="border-[6px] border-[#CA8A04] p-12 h-full flex flex-col text-left">
+            <div className="flex justify-between items-start border-b-4 border-[#CA8A04] pb-8 mb-12">
+              <div className="flex items-center gap-6 text-left">
+                <img src={logoSource} className="w-20 h-20 bg-black p-1 shadow-lg" />
+                <div className="text-left">
+                  <h1 className="text-3xl font-black uppercase tracking-widest text-left leading-none">{brandName} SYSTEMS</h1>
+                  <p className="text-[12px] text-gray-500 font-bold uppercase tracking-[0.3em] text-left mt-2 italic">{MODEL_NAME} OFFICIAL CERTIFICATE</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-gray-400 uppercase font-black mb-1 tracking-widest text-right">CERTIFICATE NO.</p>
+                <p className="text-xl font-black text-[#CA8A04] text-right">#{report.id}</p>
+              </div>
+            </div>
+
+            <div className="space-y-16 flex-1 text-left">
+              <div className="text-center">
+                <h2 className="text-[12px] font-black text-[#CA8A04] uppercase tracking-[0.5em] mb-6 text-center tracking-widest">Predicted Size Range</h2>
+                <div className="text-7xl font-black leading-none text-center opacity-30 tabular-nums italic">{report.range}<span className="text-2xl ml-2 font-mono">mm</span></div>
+                <div className="mt-8 bg-gray-50 py-12 rounded-[2.5rem] border border-gray-100 shadow-inner">
+                   <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest text-center mb-3 tracking-widest">Mean Potential Expectation</p>
+                   <p className="text-9xl font-black text-[#CA8A04] text-center tabular-nums leading-none">{report.mean} <span className="text-3xl ml-[-15px]">mm</span></p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-10 text-center px-10">
+                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                   <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">轉化效率</p>
+                   <p className="text-2xl font-black">{report.eff}</p>
+                 </div>
+                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                   <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">量測日齡</p>
+                   <p className="text-2xl font-black">{report.days}d</p>
+                 </div>
+                 <div className="bg-[#CA8A04] p-4 rounded-xl text-black">
+                   <p className="text-[10px] font-black uppercase mb-1 tracking-widest">PGK-Index</p>
+                   <p className="text-2xl font-black">{report.bpiScore}</p>
+                 </div>
+              </div>
+
+              <div className="bg-gray-50 p-10 border border-gray-200 rounded-[2.5rem] italic text-left relative">
+                <div className="absolute -top-4 left-10 bg-white px-4 text-[10px] font-black text-[#CA8A04] uppercase tracking-widest border border-gray-200 rounded-full">Bona AI Audit</div>
+                <div className="space-y-6">
+                  {report.advices.map((adv, i) => (
+                    <p key={i} className="text-base font-bold leading-relaxed text-left border-l-4 border-[#CA8A04] pl-6">「{adv}」</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-auto pt-10 border-t border-gray-100 text-center">
+              <p className="text-[10px] text-gray-400 tracking-[0.4em] font-black uppercase mb-2 text-center">Verified Scientific Data • Bona Beetle Systems</p>
+              <p className="text-[8px] text-gray-300 text-center italic">© 2024 Bona Beetle Lab • 校準轉化基準係數: 基於真實 CSV 大數據插值演算法 (V27.0)</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
