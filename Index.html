@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BONA BEETLE | BGI 專業成長追蹤與診斷系統</title>
+    
+    <!-- 核心框架載入 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700;900&display=swap');
+        
+        :root {
+            --bona-gold: #CA8A04;
+            --bona-black: #050505;
+            --bona-zinc: #18181B;
+        }
+
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: var(--bona-black); 
+            margin: 0; 
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        .bg-grid {
+            position: fixed; inset: 0; z-index: -1;
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(202, 138, 4, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(202, 138, 4, 0.05) 1px, transparent 1px);
+        }
+
+        .animate-fade-up { animation: fadeUp 0.6s ease-out forwards; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- V94.1 終極列印防護：防止黑屏方案 --- */
+        @media print {
+            @page { size: A4; margin: 0; }
+            
+            html, body { 
+                background: #FFFFFF !important; 
+                color: #000000 !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            #web-view-ui, .no-print, .bg-grid, button, footer, nav, .fixed { 
+                display: none !important; 
+            }
+
+            .print-only { 
+                display: block !important; 
+                background: #FFFFFF !important; 
+                color: #000000 !important;
+                width: 210mm !important; 
+                height: 297mm !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                padding: 15mm !important;
+                box-sizing: border-box !important;
+                z-index: 9999 !important;
+            }
+
+            * { 
+                box-shadow: none !important; 
+                text-shadow: none !important; 
+                animation: none !important; 
+                filter: none !important; 
+                transition: none !important;
+            }
+
+            .gold-text { color: #CA8A04 !important; }
+            .gold-bg { background-color: #CA8A04 !important; }
+            .border-gold { border-color: #CA8A04 !important; }
+            .bg-gray-50 { background-color: #F9FAFB !important; }
+            .text-gray-400 { color: #9CA3AF !important; }
+        }
+
+        .print-only { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 內置 SVG 圖示組件
+        const ActivityIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
+        const AwardIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M19 3v4M5 21h14M5 10h14M9 10v11M15 10v11M7 3l10 0" /></svg>;
+        const PrintIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zM9 9h6a2 2 0 002-2V5a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>;
+
+        const App = () => {
+            // --- 全域核心配置 (V94.1 BGI 對證版) ---
+            const BRAND_NAME = "BONA BEETLE";
+            const MODEL_NAME = "BONA PGK GROWTH INDEX (BGI)"; 
+            const WORLD_RECORD = 122.5;
+            const PGK_MAX_WEIGHT = 78.5;  
+            const LOGO_URL = "./logo.png";
+            const WEBHOOK_URL = "https://hook.us2.make.com/amg1tvqnbhch5cjnlh6ue57473ehlstc";
+
+            const GOLDEN_BASELINE = [
+                { d: 0, w: 0 }, { d: 150, w: 25 }, { d: 280, w: 46 }, { d: 440, w: 49 }, { d: 560, w: 37 }
+            ];
+
+            // --- 狀態管理 ---
+            const [view, setView] = useState('input'); 
+            const [activeTab, setActiveTab] = useState('curve'); 
+            const [showModal, setShowModal] = useState(false);
+            const [isSending, setIsSending] = useState(false);
+            const [contact, setContact] = useState('');
+            const [formData, setFormData] = useState({ 
+                id: '', weight: '', hatch: '', check: new Date().toISOString().split('T')[0], sub: 'plus_b' 
+            });
+            const [report, setReport] = useState(null);
+            const isUrlProcessed = useRef(false);
+
+            // --- 核心引擎：幼蟲期成長軌跡模型 ---
+            const runBonaEngine = (w, days, substrate, externalAdvice = "") => {
+                const dynamicPeakDay = Math.max(440, days + 45);
+                let estPeakWeight = w;
+                let advices = [];
+                
+                if (days < dynamicPeakDay) {
+                    const rawDailyRate = w / days;
+                    const balancedRate = (rawDailyRate * 0.45) + (0.11 * 0.55); 
+                    const remainingToPeak = dynamicPeakDay - days;
+                    const saturationFactor = (PGK_MAX_WEIGHT - w) / PGK_MAX_WEIGHT;
+                    let damping = 1.0;
+                    if (days > 320) damping = Math.max(0.05, Math.pow(0.82, (days - 320) / 10));
+                    const estimatedGain = balancedRate * remainingToPeak * Math.max(saturationFactor, 0.1) * damping;
+                    estPeakWeight = w + estimatedGain;
+                    if (days >= 350) estPeakWeight = Math.min(estPeakWeight, w * 1.10);
+                    estPeakWeight = Math.min(estPeakWeight, PGK_MAX_WEIGHT);
+                } else {
+                    estPeakWeight = w * 0.98;
+                }
+
+                const targetPupaWeight = estPeakWeight * 0.64;
+                let baseEff = 0;
+                if (targetPupaWeight <= 20) baseEff = 4.65; 
+                else if (targetPupaWeight >= 34) baseEff = 3.32; 
+                else {
+                    const t = (targetPupaWeight - 20) / (34 - 20);
+                    baseEff = 4.65 - (4.65 - 3.32) * Math.pow(t, 0.78); 
+                }
+
+                let finalEff = baseEff;
+                if (substrate === 'plus_b') finalEff *= 1.045;
+                if (substrate === 'sawdust') finalEff *= 0.965;
+
+                const maturationBonus = days >= 365 ? 1.045 : 1.0;
+                let mean = targetPupaWeight * finalEff * maturationBonus;
+                if (targetPupaWeight < 32.5) mean = Math.min(mean, 118.2);
+                mean = Math.min(mean, WORLD_RECORD);
+
+                const bgiScore = ((mean / WORLD_RECORD) * 100).toFixed(1);
+
+                if (externalAdvice) advices.push(externalAdvice);
+                if (substrate === 'plus_b') advices.push("BGI 對標：偵測到「登大蟲」配方增益，轉化品質預計領先基準。");
+                if (days >= 400) advices.push("診斷：超長週期熟化個體。體重增長已飽和，系統已切換至「密度優先」運算模型。");
+                else if (w >= 52) advices.push("診斷：強勢巨物預兆。骨架已完全擴張，請穩定溫控鎖定肉質密度。");
+                else advices.push("診斷：發育節奏穩健。數據軌跡符合高品質對標標準。");
+
+                return {
+                    dynamicPeakDay,
+                    estFinalWeight: estPeakWeight.toFixed(1),
+                    mean: mean.toFixed(1),
+                    range: `${(mean * 0.988).toFixed(1)} ~ ${(mean * 1.012).toFixed(1)}`,
+                    eff: (finalEff * maturationBonus).toFixed(2),
+                    bgiScore,
+                    status: mean > 118 ? "紀錄挑戰級" : (mean > 110 ? "高端精品" : "標準發育"),
+                    advices
+                };
+            };
+
+            const resetToInput = () => {
+                window.location.href = window.location.origin + window.location.pathname;
+            };
+
+            const submitLead = async (e) => {
+                e.preventDefault();
+                setIsSending(true);
+                try {
+                    await fetch(WEBHOOK_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: contact, report_id: report.id, model: MODEL_NAME, data: report, timestamp: new Date().toISOString() })
+                    });
+                    setIsSending(false);
+                    setShowModal(false);
+                    setTimeout(() => window.print(), 500);
+                } catch (err) { 
+                    console.error(err);
+                    setIsSending(false);
+                }
+            };
+
+            useEffect(() => {
+                if (isUrlProcessed.current) return;
+                const params = new URLSearchParams(window.location.search);
+                const urlId = params.get('id');
+                if (urlId && view === 'input' && !params.get('reset')) {
+                    const w = parseFloat(params.get('w')) || 50;
+                    const h = params.get('hatch') || "2024-01-01";
+                    const c = params.get('check') || new Date().toISOString().split('T')[0];
+                    const s = params.get('sub') || 'plus_b';
+                    const a = params.get('advice') || "";
+                    const d = Math.max(1, Math.floor((new Date(c) - new Date(h)) / (1000 * 60 * 60 * 24)));
+                    const res = runBonaEngine(w, d, s, a); 
+                    setReport({ id: urlId, weight: w, hatch: h, check: c, sub: s, rawWeight: w, days: d, ...res });
+                    setView('report');
+                    isUrlProcessed.current = true;
+                }
+            }, [view]);
+
+            const handleAnalyze = (e) => {
+                e.preventDefault();
+                setView('loading');
+                const h = new Date(formData.hatch);
+                const c = new Date(formData.check);
+                const d = Math.max(1, Math.floor((c - h) / (1000 * 60 * 60 * 24)));
+                const w = parseFloat(formData.weight) || 0;
+                const res = runBonaEngine(w, d, formData.sub);
+                setTimeout(() => {
+                    setReport({ ...formData, ...res, days: d, rawWeight: w });
+                    setView('report');
+                    setActiveTab('curve');
+                }, 1200);
+            };
+
+            const currentMaxAxisDays = report ? Math.max(650, report.days + 150) : 650;
+            const currentMaxAxisWeight = 85; 
+            const getX = (d) => (d / currentMaxAxisDays) * 100;
+            const getY = (w) => 100 - (w / currentMaxAxisWeight) * 100;
+
+            const generateSigmoidPath = () => {
+                if (!report) return "";
+                const nowX = getX(report.days);
+                const nowY = getY(report.rawWeight);
+                const targetX = getX(report.dynamicPeakDay);
+                const targetY = getY(report.estFinalWeight);
+                const cp1x = nowX * 0.25;
+                const cp1y = 99.8;
+                const cp2x = nowX * 0.8;
+                const cp2y = nowY + (100 - nowY) * 0.1;
+                const saturationTension = report.days > 400 ? 0.8 : 0.65;
+                const cp3x = nowX + (targetX - nowX) * saturationTension;
+                const cp3y = targetY - 0.3; 
+                return `M 0,100 C ${cp1x},${cp1y} ${cp2x},${cp2y} ${nowX},${nowY} Q ${cp3x},${cp3y} ${targetX},${targetY}`;
+            };
+
+            if (view === 'loading') return (
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-center p-6">
+                    <div className="w-16 h-16 border-4 border-zinc-900 border-t-[#CA8A04] rounded-full animate-spin mb-8"></div>
+                    <p className="text-[10px] text-[#CA8A04] font-mono tracking-[0.5em] animate-pulse uppercase text-center font-bold">BGI_GROWTH_CALIBRATING</p>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen bg-[#050505] p-4 md:p-10 flex flex-col items-center relative text-left select-none overflow-x-hidden font-sans italic font-black">
+                    <div className="bg-grid no-print"></div>
+
+                    {view === 'input' && (
+                        <div className="w-full max-w-md bg-[#18181B] border border-white/5 p-10 rounded-[2.5rem] shadow-2xl animate-fade-up relative z-10 font-black">
+                            <header className="text-center mb-10">
+                                <img src={LOGO_URL} className="w-20 h-20 border border-[#CA8A04] p-1 mx-auto mb-6 bg-black shadow-lg rounded-2xl" alt="Logo" />
+                                <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase leading-none">
+                                    BONA <span className="text-[#CA8A04]">GROWTH INDEX</span>
+                                </h1>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-2 font-bold italic underline decoration-[#CA8A04]/40">BGI Precision Portal</p>
+                            </header>
+                            <form onSubmit={handleAnalyze} className="space-y-6 text-left">
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] text-[#CA8A04] font-black uppercase tracking-widest ml-1 block text-left">個體識別標籤 ID</label>
+                                    <input required placeholder="例如：BGI-2026-X" className="bg-black/60 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-[#CA8A04] w-full tabular-nums font-mono" value={formData.id} onChange={e=>setFormData({...formData, id: e.target.value})} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-1 text-left">
+                                        <label className="text-[10px] text-gray-500 font-bold uppercase ml-1">挖出日期</label>
+                                        <input type="date" required className="bg-black/60 border border-white/10 p-4 rounded-xl text-xs text-white w-full font-mono" value={formData.hatch} onChange={e=>setFormData({...formData, hatch: e.target.value})} />
+                                    </div>
+                                    <div className="flex flex-col gap-1 text-left">
+                                        <label className="text-[10px] text-gray-500 font-bold uppercase ml-1">量測日期</label>
+                                        <input type="date" required className="bg-black/60 border border-white/10 p-4 rounded-xl text-xs text-white w-full font-mono" value={formData.check} onChange={e=>setFormData({...formData, check: e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="text-center bg-black/40 p-6 rounded-3xl border border-white/5 overflow-hidden flex flex-col items-center">
+                                    <label className="text-[10px] text-[#CA8A04] font-black uppercase tracking-widest mb-3 block italic text-center">當前幼蟲重量 (G)</label>
+                                    <div className="w-full flex justify-center items-center gap-2">
+                                        <input type="number" step="0.01" required placeholder="0.00" className="bg-transparent border-none text-center text-6xl font-black text-white outline-none w-full max-w-[240px] tabular-nums" value={formData.weight} onChange={e=>setFormData({...formData, weight: e.target.value})} />
+                                        <span className="text-xl font-bold text-gray-600 font-mono italic">g</span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-2 text-left">
+                                    <label className="text-[10px] text-gray-500 font-bold uppercase ml-1 tracking-widest">目前使用的飼育基質</label>
+                                    <div className="flex gap-2">
+                                        {[ {id:'sawdust', l:'純木屑'}, {id:'fungus', l:'菌瓶'}, {id:'plus_b', l:'登大蟲'} ].map(s => (
+                                            <button key={s.id} type="button" onClick={()=>setFormData({...formData, sub: s.id})} className={`flex-1 py-4 rounded-xl text-[9px] font-black transition-all ${formData.sub === s.id ? 'bg-[#CA8A04] text-black shadow-lg shadow-yellow-900/20' : 'bg-zinc-900 text-gray-500 border border-white/5'}`}>
+                                                {s.l}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full bg-[#CA8A04] text-black font-black py-5 rounded-2xl text-xs uppercase tracking-[0.3em] shadow-xl mt-4 active:scale-95 transition-all font-black">啟動 BGI 科學追蹤分析</button>
+                            </form>
+                        </div>
+                    )}
+
+                    {view === 'report' && report && (
+                        <div id="web-view-ui" className="w-full max-w-3xl bg-[#18181B] border border-[#CA8A04]/30 rounded-[2.5rem] overflow-hidden shadow-2xl relative animate-fade-up no-print">
+                            {showModal && (
+                                <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 no-print text-center">
+                                    <div className="w-full max-w-sm bg-[#18181B] border border-[#CA8A04] p-10 rounded-[2.5rem] shadow-2xl space-y-6 animate-fade-up text-center font-black">
+                                        <div className="text-4xl text-center font-bold">📧</div>
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter italic text-center">Bona 數位交付</h3>
+                                        <div className="space-y-4 px-2 text-center">
+                                            <p className="text-xs text-gray-400 leading-relaxed font-bold italic text-center">請留下您的 Email 地址：</p>
+                                            <p className="text-[10px] text-gray-500 text-balance uppercase tracking-widest font-black leading-relaxed text-center">BGI 診斷證書將立即生成 PDF，並同步將「PGK 飼育分析電子書」寄送至您的信箱。</p>
+                                        </div>
+                                        <form onSubmit={submitLead} className="space-y-4 text-center">
+                                            <input type="email" required placeholder="您的 Email 地址" className="w-full bg-black border border-white/10 p-4 rounded-xl text-white text-center outline-none focus:border-[#CA8A04] font-bold font-mono" value={contact} onChange={e=>setContact(e.target.value)} />
+                                            <button type="submit" disabled={isSending} className="w-full bg-[#CA8A04] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg active:scale-95 flex items-center justify-center gap-2 font-black italic">
+                                                {isSending ? '正在發送...' : '領取 PDF 並寄送電子書'}
+                                            </button>
+                                            <button type="button" onClick={()=>setShowModal(false)} className="text-[10px] text-gray-600 font-black uppercase py-2 block w-full text-center tracking-widest">返回報告頁面</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            )}
+
+                            <header className="p-8 border-b border-white/5 flex justify-between items-center bg-black/40">
+                                <div className="flex items-center gap-4 text-left">
+                                    <img src={LOGO_URL} className="w-12 h-12 border border-[#CA8A04] p-1 bg-black shadow-lg rounded-xl" alt="Logo" />
+                                    <div className="text-left font-black">
+                                        <h1 className="text-xl font-black text-white italic leading-none uppercase italic">BONA <span className="text-[#CA8A04]">BGI SYSTEM</span></h1>
+                                        <p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase text-left italic">Growth Trajectory Assessment</p>
+                                    </div>
+                                </div>
+                                <div className="text-right text-xs font-mono font-black text-[#CA8A04]">#{report.id}</div>
+                            </header>
+
+                            <nav className="flex bg-black/30 p-2 border-b border-white/5 no-print">
+                                {[{id:'curve', l:'成長軌跡'}, {id:'summary', l:'預估成果'}, {id:'advice', l:'專家建議'}].map(t => (
+                                    <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === t.id ? 'bg-[#CA8A04] text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+                                        {t.l}
+                                    </button>
+                                ))}
+                            </nav>
+
+                            <main className="p-8 md:p-10 min-h-[550px] relative">
+                                {activeTab === 'curve' && (
+                                    <div className="space-y-12 animate-fade-up text-left">
+                                        <div className="flex justify-between items-end px-2 text-left font-black italic">
+                                           <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                                              <ActivityIcon /> 生長對標軌跡 (Bio-Fit 3.0)
+                                           </h3>
+                                           <span className="text-[9px] text-gray-600 font-mono font-black">X: {currentMaxAxisDays}d | Y: {currentMaxAxisWeight}g</span>
+                                        </div>
+                                        
+                                        <div className="h-80 w-full border-l border-b border-zinc-800 relative flex items-end overflow-hidden bg-black/40 rounded-[2.5rem] p-6 shadow-inner text-left font-black">
+                                          <div className="absolute left-2 top-0 h-full flex flex-col justify-between py-10 pointer-events-none opacity-20 text-left font-mono font-black">
+                                             {[85, 60, 35, 10, 0].map(v => <div key={v} className="text-[8px] text-zinc-400 font-mono text-left font-black">{v}g</div>)}
+                                          </div>
+                                          <div className="absolute left-0 bottom-1 w-full flex justify-between px-12 pointer-events-none opacity-20 font-mono font-black">
+                                             {[0, Math.floor(currentMaxAxisDays*0.25), Math.floor(currentMaxAxisDays*0.5), Math.floor(currentMaxAxisDays*0.75), currentMaxAxisDays].map(v => <span key={v} className="text-[8px] text-zinc-400 font-mono text-left font-black">{v}d</span>)}
+                                          </div>
+                                          <svg className="absolute inset-0 w-full h-full p-12 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                            <path d={`M ${GOLDEN_BASELINE.map(p => `${getX(p.d)},${getY(p.w)}`).join(' L ')}`} fill="none" stroke="#27272A" strokeWidth="1.5" strokeDasharray="3" />
+                                            <path d={generateSigmoidPath()} fill="none" stroke="#CA8A04" strokeWidth="3.5" className="opacity-80 shadow-lg shadow-yellow-900/50 transition-all duration-1000" />
+                                            <circle cx={getX(report.days)} cy={getY(report.rawWeight)} r="4" fill="#CA8A04" />
+                                            <g className="animate-pulse text-center font-black">
+                                              <text x={getX(report.days)} y={getY(report.rawWeight) - 12} fill="#CA8A04" fontSize="6" textAnchor="middle" fontWeight="black" className="tabular-nums font-mono italic underline font-bold text-center font-black">NOW ({report.rawWeight}g)</text>
+                                            </g>
+                                            <circle cx={getX(report.dynamicPeakDay)} cy={getY(report.estFinalWeight)} r="5" fill="white" />
+                                            <text 
+                                                x={getX(report.dynamicPeakDay)} 
+                                                y={(getX(report.dynamicPeakDay) - getX(report.days) < 12) ? getY(report.estFinalWeight) - 25 : getY(report.estFinalWeight) - 12} 
+                                                fill="white" fontSize="6" textAnchor="middle" fontWeight="black" className="tabular-nums text-center font-mono font-bold text-balance font-black"
+                                            >
+                                                PEAK ({report.estFinalWeight}g)
+                                            </text>
+                                          </svg>
+                                        </div>
+                                        <div className="space-y-4 px-2 font-black italic">
+                                           <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-gray-500 font-black">
+                                              <span>發育熟化進度</span>
+                                              <span>{Math.min(((report.days / report.dynamicPeakDay) * 100), 100).toFixed(1)}%</span>
+                                           </div>
+                                           <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden shadow-inner font-black">
+                                              <div className="bg-[#CA8A04] h-full transition-all duration-1000" style={{ width: `${Math.min((report.days/report.dynamicPeakDay)*100, 100)}%` }}></div>
+                                           </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'summary' && (
+                                    <div className="space-y-12 animate-fade-up text-center relative z-10 font-black italic">
+                                        <div className="absolute top-0 right-0 no-print font-black">
+                                           <div className="bg-black/60 border border-[#CA8A04] p-3 rounded-2xl flex flex-col items-center shadow-[0_0_20px_rgba(202,138,4,0.3)] font-black">
+                                              <AwardIcon />
+                                              <span className="text-[8px] text-gray-500 font-black uppercase tracking-tighter mt-1 font-black">Bona Index</span>
+                                              <span className="text-sm font-black text-white font-mono font-black">{report.bgiScore}</span>
+                                           </div>
+                                        </div>
+                                        <div className="space-y-6 text-center font-black">
+                                          <h2 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] text-center italic font-black">Predicted Final Size</h2>
+                                          <div className="text-4xl md:text-5xl font-black text-white/60 tracking-tighter mb-4 tabular-nums italic text-center underline decoration-[#CA8A04]/20 text-balance font-black font-black">{report.range} <span className="text-sm font-mono ml-[-5px] font-black font-black">mm</span></div>
+                                          <div className="bg-[#CA8A04]/10 border border-[#CA8A04]/40 py-12 px-14 rounded-[3rem] inline-block shadow-[0_0_60px_rgba(202,138,4,0.4)] relative overflow-hidden group font-black">
+                                             <div className="absolute inset-0 bg-[#CA8A04]/5 animate-pulse font-black"></div>
+                                             <p className="text-[11px] text-[#CA8A04] font-black uppercase tracking-[0.3em] mb-4 relative z-10 text-center uppercase tracking-widest leading-none italic font-black">Mean Potential Expectation</p>
+                                             {/* 字體比例優化 */}
+                                             <p className="text-6xl md:text-7xl lg:text-8xl font-black text-[#CA8A04] gold-glow leading-none relative z-10 tabular-nums text-center font-black font-black">
+                                               {report.mean} <span className="text-2xl md:text-3xl ml-[-10px] font-mono italic font-black">mm</span>
+                                             </p>
+                                          </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 text-center font-black font-black">
+                                           {[
+                                             { l: "預估頂峰重", v: report.estFinalWeight + "g", s: "Peak-W", c: "text-[#CA8A04]" },
+                                             { l: "轉化評級", v: report.status, s: "Rating", c: "text-white text-[10px] font-black uppercase font-black" },
+                                             { l: "BGI 性能值", v: report.bgiScore, s: "BGI", c: "text-white" }
+                                           ].map((idx, i) => (
+                                             <div key={i} className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center transition-transform hover:scale-105 text-center font-black font-black font-black">
+                                               <div className="text-[8px] text-gray-600 uppercase font-black mb-1 tracking-widest text-center uppercase tracking-widest text-center leading-none font-black font-black font-black">{idx.l}</div>
+                                               <div className={`text-xl font-black font-mono ${idx.c} text-center font-bold font-black font-black`}>{idx.v}</div>
+                                               <div className="text-[8px] text-gray-800 font-mono uppercase mt-1 opacity-50 text-center text-center font-mono font-black font-black">{idx.s}</div>
+                                             </div>
+                                           ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'advice' && (
+                                    <div className="space-y-8 animate-fade-up text-left font-black italic">
+                                        <div className="bg-white text-black p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden text-left shadow-yellow-900/10 font-black">
+                                          <div className="flex gap-8 items-start relative z-10 text-left font-black">
+                                            <div className="w-16 h-16 rounded-2xl bg-black flex items-center justify-center text-[#CA8A04] text-3xl shrink-0 font-black shadow-xl underline decoration-[#CA8A04] font-black">B</div>
+                                            <div className="space-y-5 flex-1 text-left font-black">
+                                              <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] text-left italic font-black leading-none">Bona AI Core Diagnostic Report</p>
+                                              <div className="space-y-4 text-left font-bold font-black">
+                                                {report.advices.map((adv, idx) => (
+                                                  <p key={idx} className="text-base text-black leading-relaxed italic border-l-4 border-gold pl-6 text-left text-balance font-black font-black">「{adv}」</p>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-4 font-black">
+                                          <button onClick={()=>setShowModal(true)} className="w-full bg-[#CA8A04] text-black font-black py-8 rounded-[2.5rem] text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-yellow-500 transition-all font-bold text-center active:scale-95 shadow-yellow-900/30 flex items-center justify-center gap-3 font-black">
+                                            <PrintIcon /> 立即領取 PDF (列印)
+                                          </button>
+                                          <p className="text-[11px] text-gray-600 text-center italic font-bold px-6 leading-relaxed font-black font-black">
+                                            包含個體全週期 BGI 曲線診斷，並同步將 <span className="text-white underline decoration-[#CA8A04] font-black">《PGK 巔峰飼育分析》電子書</span> 寄送至您的信箱
+                                          </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </main>
+                        </div>
+                    )}
+
+                    <button onClick={resetToInput} className="mt-12 text-[11px] text-gray-500 font-black uppercase tracking-[0.5em] hover:text-[#CA8A04] transition-all no-print block text-center underline font-bold py-5 px-12 bg-zinc-900/50 rounded-full border border-white/10 shadow-xl hover:bg-zinc-800 font-black italic font-black">
+                        ← 返回重新錄入 (PHYSICAL RESET)
+                    </button>
+
+                    {/* --- A4 列印模板 (BGI 專業對證版) --- */}
+                    {report && (
+                        <div className="print-only font-black bg-white">
+                          <div className="border-[1.5mm] border-gold p-10 h-full flex flex-col text-left bg-white relative font-black">
+                            
+                            <div className="flex justify-between items-start border-b-[1mm] border-gold pb-6 mb-10 bg-white">
+                              <div className="flex items-center gap-6 text-left bg-white">
+                                <img src={LOGO_URL} className="w-20 h-20 bg-black p-1 rounded-xl" alt="Logo" />
+                                <div className="text-left text-black bg-white">
+                                  <h1 className="text-4xl font-black uppercase tracking-tighter text-left leading-none italic font-black">BONA BEETLE</h1>
+                                  <p className="text-[12px] text-gray-500 font-bold uppercase tracking-[0.4em] text-left mt-2 italic font-black font-black">{MODEL_NAME} OFFICIAL CERTIFICATE</p>
+                                </div>
+                              </div>
+                              <div className="text-right bg-white font-black">
+                                <p className="text-[10px] text-gray-400 uppercase font-black mb-1 tracking-widest text-right italic font-mono font-black">CERTIFICATE ID</p>
+                                <p className="text-xl font-black gold-text font-mono font-black">#{report.id}</p>
+                                <div className="mt-2 bg-black gold-text px-4 py-1 text-xs font-black rounded italic font-black">BGI SCORE: {report.bgiScore}</div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-8 mb-10 border-b border-gray-100 pb-8 bg-white font-black">
+                                <div className="space-y-3 bg-white font-black">
+                                    <h3 className="text-[10px] text-gray-400 font-black uppercase tracking-widest border-l-4 border-gold pl-2 font-black">Specimen Bio-Identity</h3>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-black">
+                                        <p><span className="text-gray-400 font-black">編號:</span> <span className="font-bold">{report.id}</span></p>
+                                        <p><span className="text-gray-400 font-black">物種:</span> <span className="font-bold italic">PGK (keisukei)</span></p>
+                                        <p><span className="text-gray-400 font-black">挖出:</span> <span className="font-bold font-mono">{report.hatch}</span></p>
+                                        <p><span className="text-gray-400 font-black">今日:</span> <span className="font-bold font-mono">{report.check}</span></p>
+                                        <p className="col-span-2 font-black"><span className="text-gray-400 font-black">食材:</span> <span className="font-bold font-black">{report.sub === 'plus_b' ? '木屑 + 登大蟲 (+B)' : report.sub === 'fungus' ? '菌瓶' : '純木屑'}</span></p>
+                                    </div>
+                                </div>
+                                <div className="space-y-3 bg-white font-black">
+                                    <h3 className="text-[10px] text-gray-400 font-black uppercase tracking-widest border-l-4 border-gold pl-2 font-black">Growth Status</h3>
+                                    <div className="flex items-center gap-6 bg-white font-black">
+                                        <div className="text-center font-black">
+                                            <p className="text-[9px] text-gray-400 uppercase font-black font-black">量測體重</p>
+                                            <p className="text-3xl font-black italic font-black font-black">{report.rawWeight}g</p>
+                                        </div>
+                                        <div className="text-center font-black">
+                                            <p className="text-[9px] text-gray-400 uppercase font-black font-black">量測日齡</p>
+                                            <p className="text-3xl font-black italic font-black font-black">{report.days}d</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 flex flex-col justify-center items-center py-6 bg-white font-black font-black">
+                                <div className="text-center mb-8 bg-white font-black">
+                                    <h2 className="text-[14px] font-black gold-text uppercase tracking-[0.5em] mb-4 italic underline underline-offset-8 decoration-2 font-black uppercase">Predicted Potential Expectation</h2>
+                                    <div className="bg-gray-50 py-12 px-20 rounded-[4rem] border border-gray-100 relative font-black">
+                                        <div className="text-[100px] font-black gold-text leading-none font-mono italic tabular-nums font-black font-black">{report.mean}<span className="text-4xl ml-[-10px] font-black">mm</span></div>
+                                        <p className="text-[16px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2 italic font-black font-black">Standard Size Mean Prediction</p>
+                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 gold-bg text-black px-10 py-2 text-sm font-black rounded-full italic font-black font-black shadow-none">
+                                            SIZE RANGE: {report.range} mm
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="w-full h-48 bg-white border border-gray-100 rounded-3xl p-6 relative mb-8 font-black">
+                                    <p className="text-[8px] text-gray-300 font-bold absolute top-2 right-6 uppercase italic font-black tracking-widest font-black">Growth Trajectory Analysis</p>
+                                    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                        <path d={`M ${GOLDEN_BASELINE.map(p => `${getX(p.d)},${getY(p.w)}`).join(' L ')}`} fill="none" stroke="#F0F0F0" strokeWidth="1" strokeDasharray="2" />
+                                        <path d={generateSigmoidPath()} fill="none" stroke="#CA8A04" strokeWidth="2.5" />
+                                        <circle cx={getX(report.days)} cy={getY(report.rawWeight)} r="1.5" fill="#CA8A04" />
+                                        <circle cx={getX(report.dynamicPeakDay)} cy={getY(report.estFinalWeight)} r="1.5" fill="#000" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-8 border border-gray-100 rounded-[2.5rem] italic text-left relative mt-4 font-black">
+                                <div className="absolute -top-4 left-10 gold-bg px-6 py-1 text-[10px] font-black text-black uppercase tracking-widest rounded-full italic font-black font-black">Bona AI Core Diagnostic</div>
+                                <div className="space-y-3 pt-2 bg-gray-50 font-black">
+                                    {report.advices.map((adv, i) => (
+                                        <p key={i} className="text-sm font-bold leading-relaxed text-black border-l-4 border-gold pl-6 italic font-black font-black">「{adv}」</p>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mt-auto pt-10 border-t border-gray-100 flex justify-between items-end bg-white font-black">
+                              <div className="text-left space-y-2 bg-white font-black">
+                                <p className="text-[10px] text-gray-400 tracking-[0.3em] font-black uppercase italic font-black font-black">Verified Scientific Data • Bona Beetle Systems</p>
+                                <p className="text-[8px] text-gray-600 italic font-black font-black">© 2024 Bona Beetle Lab • 基於 30 筆真實樣本與動態生理飽和模型校準 (V94.1)</p>
+                              </div>
+                              <div className="w-16 h-16 border border-gray-100 p-1 bg-white flex items-center justify-center font-black">
+                                 <div className="text-[6px] text-gray-400 text-center uppercase font-mono font-black font-black">BBS-VERIFY<br/>QR-SECURE</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
