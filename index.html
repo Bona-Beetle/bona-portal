@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BONA BPI | PGK 成長軌跡科學追蹤系統 (BGI)</title>
+    <title>BONA BGI | PGK 成長軌跡科學追蹤系統 (BGI)</title>
     
     <!-- 核心框架載入 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -65,20 +65,25 @@
         }
 
         .print-only { display: none; }
+        
+        /* 強化日期選取器的外觀，確保月日清楚 */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef } = React;
 
-        // 內置 SVG 圖示 (科技感)
+        // 內置 SVG 圖示
         const ActivityIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
         const IconTarget = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A3.323 3.323 0 0010.605 8.65a3.323 3.323 0 01-1.643.361 3.323 3.323 0 00-3.03 3.03 3.323 3.323 0 01-.361 1.643 3.323 3.323 0 000.767 3.922 3.323 3.323 0 010.213 1.643 3.323 3.323 0 003.03 3.03 3.323 3.323 0 011.643.361 3.323 3.323 0 003.922-0.767 3.323 3.323 0 011.643-0.213 3.323 3.323 0 003.03-3.03 3.323 3.323 0 010.361-1.643 3.323 3.323 0 00-0.767-3.922 3.323 3.323 0 01-0.213-1.643 3.323 3.323 0 00-3.03-3.03 3.323 3.323 0 01-1.643-0.361z" /></svg>;
 
         const App = () => {
-            // --- 全域核心配置 ---
             const BRAND_NAME = "BONA BEETLE";
             const SYSTEM_NAME = "BONA GROWTH INDEX (BGI)"; 
             const SUB_NAME = "PGK GROWTH TRAJECTORY"; 
@@ -91,19 +96,24 @@
                 { d: 0, w: 0 }, { d: 150, w: 25 }, { d: 280, w: 46 }, { d: 440, w: 49 }, { d: 560, w: 37 }
             ];
 
-            // --- 狀態管理 ---
             const [view, setView] = useState('input'); 
             const [activeTab, setActiveTab] = useState('curve'); 
             const [showModal, setShowModal] = useState(false);
             const [isSending, setIsSending] = useState(false);
             const [contact, setContact] = useState('');
+            
+            // 修復點：預設挖出日期為一個月前，確保 Date Picker 正確初始化
             const [formData, setFormData] = useState({ 
-                id: '', weight: '', hatch: '', check: new Date().toISOString().split('T')[0], sub: 'plus_b' 
+                id: '', 
+                weight: '', 
+                hatch: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0], 
+                check: new Date().toISOString().split('T')[0], 
+                sub: 'plus_b' 
             });
+            
             const [report, setReport] = useState(null);
             const isUrlProcessed = useRef(false);
 
-            // --- BGI 成長診斷引擎 ---
             const runBGIEngine = (w, days, substrate, externalAdvice = "") => {
                 const dynamicPeakDay = Math.max(440, days + 45);
                 let estPeakWeight = w;
@@ -154,7 +164,7 @@
                 };
             };
 
-            const resetSystem = () => window.location.replace(window.location.origin + window.location.pathname);
+            const resetSystem = () => window.location.assign(window.location.origin + window.location.pathname);
 
             useEffect(() => {
                 if (isUrlProcessed.current) return;
@@ -232,7 +242,7 @@
             );
 
             return (
-                <div className="min-h-screen bg-[#050505] p-4 md:p-10 flex flex-col items-center relative text-left select-none overflow-x-hidden font-sans font-black italic">
+                <div className="min-h-screen bg-[#050505] p-4 md:p-10 flex flex-col items-center relative text-left overflow-x-hidden font-sans font-black italic">
                     <div className="bg-blueprint"></div>
 
                     {view === 'input' && (
@@ -251,7 +261,7 @@
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 font-black">
                                     <div className="flex flex-col gap-1 font-black">
-                                        <label className="text-[10px] text-gray-500 font-bold uppercase ml-1">幼蟲挖出日期</label>
+                                        <label className="text-[10px] text-gray-500 font-bold uppercase ml-1">挖出日期</label>
                                         <input type="date" required className="bg-black/60 border border-white/10 p-4 rounded-xl text-xs text-white w-full font-mono" value={formData.hatch} onChange={e=>setFormData({...formData, hatch: e.target.value})} />
                                     </div>
                                     <div className="flex flex-col gap-1 font-black">
@@ -276,7 +286,7 @@
                                         ))}
                                     </div>
                                 </div>
-                                <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-black py-5 rounded-2xl text-xs uppercase tracking-[0.3em] shadow-xl mt-4 active:scale-95 transition-all font-black">啟動 BGI 科技成長追蹤</button>
+                                <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-black py-5 rounded-2xl text-xs uppercase tracking-[0.3em] shadow-xl mt-4 active:scale-95 transition-all font-black italic">啟動 BGI 科技成長追蹤</button>
                             </form>
                         </div>
                     )}
@@ -286,11 +296,11 @@
                             {showModal && (
                                 <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 no-print text-center font-black">
                                     <div className="w-full max-w-sm bg-zinc-900 border border-cyan-500 p-10 rounded-[2.5rem] shadow-2xl space-y-6 animate-fade-up text-center">
-                                        <div className="text-4xl text-center font-bold">📧</div>
-                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Bona 數位交付</h3>
+                                        <div className="text-4xl text-center font-bold font-black">📧</div>
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter italic font-black">Bona 數位交付</h3>
                                         <div className="space-y-4 px-2 text-center font-black">
-                                            <p className="text-xs text-gray-400 leading-relaxed font-bold italic text-center">請留下您的 Email 地址：</p>
-                                            <p className="text-[10px] text-gray-500 text-balance uppercase tracking-widest font-black leading-relaxed text-center">BGI 診斷報告將立即生成 PDF，並同步將「PGK 飼育分析電子書」寄送至您的信箱。</p>
+                                            <p className="text-xs text-gray-400 leading-relaxed font-bold italic text-center font-black">請留下您的 Email 地址：</p>
+                                            <p className="text-[10px] text-gray-500 text-balance uppercase tracking-widest font-black leading-relaxed text-center font-black">BGI 診斷報告將立即生成 PDF，並同步將「PGK 飼育分析電子書」寄送至您的信箱。</p>
                                         </div>
                                         <form onSubmit={submitLead} className="space-y-4 text-center font-black">
                                             <input type="email" required placeholder="您的 Email 地址" className="w-full bg-black border border-white/10 p-4 rounded-xl text-white text-center outline-none focus:border-cyan-500 font-bold font-mono" value={contact} onChange={e=>setContact(e.target.value)} />
@@ -307,7 +317,7 @@
                                 <div className="flex items-center gap-4 text-left font-black">
                                     <img src={LOGO_URL} className="w-12 h-12 border border-cyan-500/40 p-1 bg-black shadow-lg rounded-xl" alt="Logo" />
                                     <div className="text-left font-black">
-                                        <h1 className="text-lg md:text-xl font-black text-white italic leading-none uppercase italic">BONA <span className="text-cyan-500">BGI SYSTEM</span></h1>
+                                        <h1 className="text-lg md:text-xl font-black text-white italic leading-none uppercase italic font-black">BONA <span className="text-cyan-500">BGI SYSTEM</span></h1>
                                         <p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase text-left italic">Growth Trajectory Assessment</p>
                                     </div>
                                 </div>
@@ -316,7 +326,7 @@
 
                             <nav className="flex bg-black/20 p-2 border-b border-white/5 no-print font-black">
                                 {[{id:'curve', l:'成長軌跡'}, {id:'summary', l:'預估成果'}, {id:'advice', l:'診斷建議'}].map(t => (
-                                    <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === t.id ? 'bg-cyan-600 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+                                    <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === t.id ? 'bg-cyan-600 text-white shadow-lg' : 'text-gray-500 hover:text-white font-black'}`}>
                                         {t.l}
                                     </button>
                                 ))}
@@ -333,17 +343,17 @@
                                         </div>
                                         
                                         <div className="h-80 w-full border-l border-b border-zinc-800 relative flex items-end overflow-hidden bg-black/40 rounded-[2.5rem] p-6 shadow-inner text-left font-black">
-                                          <div className="absolute left-2 top-0 h-full flex flex-col justify-between py-10 pointer-events-none opacity-20 text-left font-mono">
+                                          <div className="absolute left-2 top-0 h-full flex flex-col justify-between py-10 pointer-events-none opacity-20 text-left font-mono font-black">
                                              {[85, 60, 35, 10, 0].map(v => <div key={v} className="text-[8px] text-cyan-500 font-mono text-left font-black">{v}g</div>)}
                                           </div>
-                                          <div className="absolute left-0 bottom-1 w-full flex justify-between px-12 pointer-events-none opacity-20 font-mono">
+                                          <div className="absolute left-0 bottom-1 w-full flex justify-between px-12 pointer-events-none opacity-20 font-mono font-black">
                                              {[0, Math.floor(currentMaxAxisDays*0.25), Math.floor(currentMaxAxisDays*0.5), Math.floor(currentMaxAxisDays*0.75), currentMaxAxisDays].map(v => <span key={v} className="text-[8px] text-cyan-500 font-mono text-left font-black">{v}d</span>)}
                                           </div>
                                           <svg className="absolute inset-0 w-full h-full p-12 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
                                             <path d={`M ${GOLDEN_BASELINE.map(p => `${getX(p.d)},${getY(p.w)}`).join(' L ')}`} fill="none" stroke="#164E63" strokeWidth="1" strokeDasharray="3" />
                                             <path d={generateSigmoidPath()} fill="none" stroke="#06B6D4" strokeWidth="3" className="opacity-80 shadow-lg shadow-cyan-900/50 transition-all duration-1000" />
                                             <circle cx={getX(report.days)} cy={getY(report.rawWeight)} r="4" fill="#06B6D4" />
-                                            <g className="animate-pulse text-center font-black">
+                                            <g className="animate-pulse text-center font-black font-black">
                                               <text x={getX(report.days)} y={getY(report.rawWeight) - 12} fill="#06B6D4" fontSize="6" textAnchor="middle" fontWeight="black" className="tabular-nums font-mono italic underline font-bold text-center">NOW ({report.rawWeight}g)</text>
                                             </g>
                                             <circle cx={getX(report.dynamicPeakDay)} cy={getY(report.estFinalWeight)} r="5" fill="white" />
@@ -370,34 +380,34 @@
 
                                 {activeTab === 'summary' && (
                                     <div className="space-y-12 animate-fade-up text-center relative z-10 font-black italic">
-                                        <div className="absolute top-0 right-0 no-print font-black">
+                                        <div className="absolute top-0 right-0 no-print font-black font-black">
                                            <div className="bg-black/60 border border-cyan-500/40 p-3 rounded-2xl flex flex-col items-center shadow-[0_0_20px_rgba(6,182,212,0.2)] font-black">
                                               <IconTarget />
-                                              <span className="text-[8px] text-gray-500 font-black uppercase tracking-tighter mt-1">Growth Score</span>
-                                              <span className="text-sm font-black text-white font-mono">{report.bpiScore}</span>
+                                              <span className="text-[8px] text-gray-500 font-black uppercase tracking-tighter mt-1 font-black">Growth Score</span>
+                                              <span className="text-sm font-black text-white font-mono font-black">{report.bpiScore}</span>
                                            </div>
                                         </div>
                                         <div className="space-y-6 text-center font-black">
                                           <h2 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] text-center italic font-black uppercase font-black">Predicted Pupa Performance</h2>
                                           <div className="text-4xl md:text-5xl font-black text-white/60 tracking-tighter mb-4 tabular-nums italic text-center underline decoration-cyan-500/20 text-balance font-black">{report.range} <span className="text-sm font-mono ml-[-5px]">mm</span></div>
                                           <div className="bg-cyan-500/10 border border-cyan-500/40 py-12 px-14 rounded-[3rem] inline-block shadow-[0_0_60px_rgba(6,182,212,0.2)] relative overflow-hidden group font-black">
-                                             <div className="absolute inset-0 bg-cyan-500/5 animate-pulse font-black"></div>
+                                             <div className="absolute inset-0 bg-cyan-500/5 animate-pulse font-black font-black"></div>
                                              <p className="text-[11px] text-cyan-500 font-black uppercase tracking-[0.3em] mb-4 relative z-10 text-center uppercase tracking-widest leading-none italic font-black">Predicted Adult Potential</p>
-                                             <p className="text-6xl md:text-8xl font-black text-cyan-500 leading-none relative z-10 tabular-nums text-center font-black font-black font-mono">
+                                             <p className="text-6xl md:text-8xl font-black text-cyan-500 leading-none relative z-10 tabular-nums text-center font-black font-black font-mono font-black">
                                                {report.mean} <span className="text-2xl md:text-3xl ml-[-10px] font-mono italic font-black">mm</span>
                                              </p>
                                           </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4 text-center font-black">
                                            {[
-                                             { l: "預估頂峰重", v: report.estFinalWeight + "g", s: "Peak-W", c: "text-cyan-500 font-mono" },
-                                             { l: "轉化評級", v: report.status, s: "Rating", c: "text-white text-[10px] font-black uppercase" },
-                                             { l: "當前日齡", v: report.days + "d", s: "Age", c: "text-white font-mono" }
+                                             { l: "預估頂峰重", v: report.estFinalWeight + "g", s: "Peak-W", c: "text-cyan-500 font-mono font-black" },
+                                             { l: "轉化評級", v: report.status, s: "Rating", c: "text-white text-[10px] font-black uppercase font-black" },
+                                             { l: "當前日齡", v: report.days + "d", s: "Age", c: "text-white font-mono font-black" }
                                            ].map((idx, i) => (
-                                             <div key={i} className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center transition-transform hover:scale-105 text-center font-black">
-                                               <div className="text-[8px] text-gray-600 uppercase font-black mb-1 tracking-widest text-center uppercase tracking-widest text-center leading-none font-black font-black">{idx.l}</div>
-                                               <div className={`text-xl font-black ${idx.c} text-center font-bold`}>{idx.v}</div>
-                                               <div className="text-[8px] text-gray-800 font-mono uppercase mt-1 opacity-50 text-center text-center font-mono font-black">{idx.s}</div>
+                                             <div key={i} className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center transition-transform hover:scale-105 text-center font-black font-black">
+                                               <div className="text-[8px] text-gray-600 uppercase font-black mb-1 tracking-widest text-center uppercase tracking-widest text-center leading-none font-black font-black font-black">{idx.l}</div>
+                                               <div className={`text-xl font-black ${idx.c} text-center font-bold font-black`}>{idx.v}</div>
+                                               <div className="text-[8px] text-gray-800 font-mono uppercase mt-1 opacity-50 text-center text-center font-mono font-black font-black">{idx.s}</div>
                                              </div>
                                            ))}
                                         </div>
@@ -405,26 +415,26 @@
                                 )}
 
                                 {activeTab === 'advice' && (
-                                    <div className="space-y-8 animate-fade-up text-left font-black italic">
-                                        <div className="bg-white text-black p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden text-left font-black font-black">
+                                    <div className="space-y-8 animate-fade-up text-left font-black italic font-black">
+                                        <div className="bg-white text-black p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden text-left font-black font-black font-black">
                                           <div className="flex gap-8 items-start relative z-10 text-left font-black font-black font-black">
-                                            <div className="w-16 h-16 rounded-2xl bg-black flex items-center justify-center text-cyan-500 text-3xl shrink-0 font-black shadow-xl underline decoration-cyan-500 font-black">B</div>
-                                            <div className="space-y-5 flex-1 text-left font-black font-black font-black font-black">
-                                              <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] text-left italic font-black leading-none uppercase">BGI Diagnostic Insights</p>
-                                              <div className="space-y-4 text-left font-bold font-black font-black font-black font-black">
+                                            <div className="w-16 h-16 rounded-2xl bg-black flex items-center justify-center text-cyan-500 text-3xl shrink-0 font-black shadow-xl underline decoration-cyan-500 font-black font-black">B</div>
+                                            <div className="space-y-5 flex-1 text-left font-black font-black font-black font-black font-black">
+                                              <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] text-left italic font-black leading-none uppercase font-black">BGI Diagnostic Insights</p>
+                                              <div className="space-y-4 text-left font-bold font-black font-black font-black font-black font-black">
                                                 {report.advices.map((adv, idx) => (
-                                                  <p key={idx} className="text-base text-black leading-relaxed italic border-l-4 border-cyan-500 pl-6 text-left text-balance font-black font-black font-black">「{adv}」</p>
+                                                  <p key={idx} className="text-base text-black leading-relaxed italic border-l-4 border-cyan-500 pl-6 text-left text-balance font-black font-black font-black font-black font-black">「{adv}」</p>
                                                 ))}
                                               </div>
                                             </div>
                                           </div>
                                         </div>
-                                        <div className="space-y-4 font-black font-black font-black font-black text-center font-black">
-                                          <button onClick={()=>setShowModal(true)} className="w-full bg-cyan-600 text-white font-black py-8 rounded-[2.5rem] text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-cyan-500 transition-all font-bold text-center active:scale-95 flex items-center justify-center gap-3">
-                                            <span>🖨️</span> 下載 BGI 科學診斷報告 (PDF)
+                                        <div className="space-y-4 font-black font-black font-black font-black text-center font-black font-black">
+                                          <button onClick={()=>setShowModal(true)} className="w-full bg-cyan-600 text-white font-black py-8 rounded-[2.5rem] text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-cyan-500 transition-all font-bold text-center active:scale-95 flex items-center justify-center gap-3 font-black italic">
+                                            <span>🖨️</span> 下載 BGI 科技診斷報告 (PDF)
                                           </button>
-                                          <p className="text-[11px] text-gray-600 text-center italic font-bold px-6 leading-relaxed font-black font-black font-black">
-                                            同步將 <span className="text-white underline decoration-cyan-500 font-black font-black">《PGK 巔峰飼育分析》電子書</span> 寄送至您的信箱
+                                          <p className="text-[11px] text-gray-600 text-center italic font-bold px-6 leading-relaxed font-black font-black font-black font-black">
+                                            同步將 <span className="text-white underline decoration-cyan-500 font-black font-black font-black">《PGK 巔峰飼育分析》電子書</span> 寄送至您的信箱
                                           </p>
                                         </div>
                                     </div>
@@ -433,85 +443,85 @@
                         </div>
                     )}
 
-                    <button onClick={resetSystem} className="mt-12 text-[11px] text-cyan-900 font-black uppercase tracking-[0.5em] hover:text-cyan-400 transition-all no-print block text-center underline font-bold py-5 px-12 bg-zinc-900/50 rounded-full border border-white/10 shadow-xl hover:bg-zinc-800 font-black italic font-black">
+                    <button onClick={resetSystem} className="mt-12 text-[11px] text-cyan-900 font-black uppercase tracking-[0.5em] hover:text-cyan-400 transition-all no-print block text-center underline font-bold py-5 px-12 bg-zinc-900/50 rounded-full border border-white/10 shadow-xl hover:bg-zinc-800 font-black italic font-black font-black font-black">
                         ← 返回重新錄入 (CORE RESET)
                     </button>
 
-                    {/* --- A4 列印模板 (BGI 修正版) --- */}
+                    {/* --- A4 列印模板 --- */}
                     {report && (
                         <div className="print-only font-black bg-white overflow-hidden font-black">
-                          <div className="border-[1.5mm] border-cyan-500 p-10 h-full flex flex-col text-left bg-white relative font-black bg-white font-black font-black">
+                          <div className="border-[1.5mm] border-cyan-500 p-10 h-full flex flex-col text-left bg-white relative font-black bg-white font-black font-black font-black">
                             
                             <div className="flex justify-between items-start border-b-[1mm] border-cyan-500 pb-6 mb-10 bg-white font-black">
-                              <div className="flex items-center gap-6 text-left bg-white font-black">
+                              <div className="flex items-center gap-6 text-left bg-white font-black font-black">
                                 <img src={LOGO_URL} className="w-20 h-20 bg-black p-1 rounded-xl" alt="Logo" />
-                                <div className="text-left text-black bg-white font-black">
-                                  <h1 className="text-4xl font-black uppercase tracking-tighter text-left leading-none italic font-black font-black">BONA BEETLE</h1>
-                                  <p className="text-[12px] text-gray-500 font-bold uppercase tracking-[0.4em] text-left mt-2 italic font-black uppercase font-black">{SYSTEM_NAME}</p>
+                                <div className="text-left text-black bg-white font-black font-black">
+                                  <h1 className="text-4xl font-black uppercase tracking-tighter text-left leading-none italic font-black font-black font-black">BONA BEETLE</h1>
+                                  <p className="text-[12px] text-gray-500 font-bold uppercase tracking-[0.4em] text-left mt-2 italic font-black uppercase font-black font-black">{SYSTEM_NAME}</p>
                                 </div>
                               </div>
-                              <div className="text-right bg-white font-black">
+                              <div className="text-right bg-white font-black font-black font-black">
                                 <p className="text-[10px] text-gray-400 uppercase font-black mb-1 tracking-widest text-right italic font-mono font-black">REPORT ID</p>
-                                <p className="text-xl font-black cyan-text font-mono font-black">#{report.id}</p>
-                                <div className="mt-2 bg-black text-white px-4 py-1 text-xs font-black rounded italic">BGI SCORE: {report.bpiScore}</div>
+                                <p className="text-xl font-black cyan-text font-mono font-black font-black">#{report.id}</p>
+                                <div className="mt-2 bg-black text-white px-4 py-1 text-xs font-black rounded italic font-black font-black">BGI SCORE: {report.bpiScore}</div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-8 mb-10 border-b border-gray-100 pb-8 bg-white font-black">
-                                <div className="space-y-3 bg-white font-black">
+                            <div className="grid grid-cols-2 gap-8 mb-10 border-b border-gray-100 pb-8 bg-white font-black font-black font-black">
+                                <div className="space-y-3 bg-white font-black font-black font-black">
                                     <h3 className="text-[10px] text-gray-400 font-black uppercase tracking-widest border-l-4 border-cyan-500 pl-2 uppercase font-black font-black">Specimen Bio-Identity</h3>
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-black font-black">
-                                        <p><span className="text-gray-400">鑑定類型:</span> <span className="font-bold italic uppercase">GROWTH_TRAJECTORY</span></p>
-                                        <p><span className="text-gray-400">編號:</span> <span className="font-bold">{report.id}</span></p>
-                                        <p><span className="text-gray-400">物種:</span> <span className="font-bold italic">PGK (keisukei)</span></p>
-                                        <p><span className="text-gray-400">當前日齡:</span> <span className="font-bold font-mono">{report.days}d</span></p>
-                                        <p className="col-span-2 font-black"><span className="text-gray-400 font-black font-black">食材:</span> <span className="font-bold font-black font-black">{report.sub === 'plus_b' ? '木屑 + 登大蟲 (+B)' : report.sub === 'fungus' ? '菌瓶' : '純木屑'}</span></p>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-black font-black font-black">
+                                        <p><span className="text-gray-400">鑑定類型:</span> <span className="font-bold italic uppercase font-black font-black">GROWTH_TRAJECTORY</span></p>
+                                        <p><span className="text-gray-400">編號:</span> <span className="font-bold font-black">{report.id}</span></p>
+                                        <p><span className="text-gray-400">物種:</span> <span className="font-bold italic font-black">PGK (keisukei)</span></p>
+                                        <p><span className="text-gray-400">當前日齡:</span> <span className="font-bold font-mono font-black">{report.days}d</span></p>
+                                        <p className="col-span-2 font-black font-black"><span className="text-gray-400 font-black font-black font-black">食材:</span> <span className="font-bold font-black font-black font-black">{report.sub === 'plus_b' ? '木屑 + 登大蟲 (+B)' : report.sub === 'fungus' ? '菌瓶' : '純木屑'}</span></p>
                                     </div>
                                 </div>
-                                <div className="space-y-3 bg-white font-black">
+                                <div className="space-y-3 bg-white font-black font-black font-black">
                                     <h3 className="text-[10px] text-gray-400 font-black uppercase tracking-widest border-l-4 border-cyan-500 pl-2 uppercase font-black font-black">Diagnostic Summary</h3>
-                                    <div className="flex items-center gap-6 bg-white font-black font-black">
-                                        <div className="text-center font-black">
-                                            <p className="text-[9px] text-gray-400 uppercase font-black font-black">量測體重</p>
-                                            <p className="text-3xl font-black italic font-black font-black font-mono">{report.rawWeight}g</p>
+                                    <div className="flex items-center gap-6 bg-white font-black font-black font-black">
+                                        <div className="text-center font-black font-black font-black">
+                                            <p className="text-[9px] text-gray-400 uppercase font-black font-black font-black">量測體重</p>
+                                            <p className="text-3xl font-black italic font-black font-black font-mono font-black">{report.rawWeight}g</p>
                                         </div>
-                                        <div className="text-center font-black">
-                                            <p className="text-[9px] text-gray-400 uppercase font-black font-black">成熟狀態</p>
-                                            <p className="text-3xl font-black italic font-black font-black font-black">{report.status}</p>
+                                        <div className="text-center font-black font-black font-black">
+                                            <p className="text-[9px] text-gray-400 uppercase font-black font-black font-black">成熟狀態</p>
+                                            <p className="text-3xl font-black italic font-black font-black font-black font-black">{report.status}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex-1 flex flex-col justify-center items-center py-6 bg-white font-black font-black">
+                            <div className="flex-1 flex flex-col justify-center items-center py-6 bg-white font-black font-black font-black">
                                 <div className="text-center mb-8 bg-white font-black font-black">
-                                    <h2 className="text-[14px] font-black cyan-text uppercase tracking-[0.5em] mb-4 italic underline underline-offset-8 decoration-2 font-black uppercase font-black">Predicted Potential Emergence Range</h2>
+                                    <h2 className="text-[14px] font-black cyan-text uppercase tracking-[0.5em] mb-4 italic underline underline-offset-8 decoration-2 font-black uppercase font-black">Predicted Final Size Range</h2>
                                     <div className="bg-gray-50 py-12 px-20 rounded-[4rem] border border-gray-100 relative font-black shadow-none font-black font-black">
-                                        <div className="text-[90px] font-black cyan-text leading-none font-mono italic tabular-nums font-black font-black font-black tracking-tighter">{report.range}</div>
-                                        <p className="text-[16px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-4 italic font-black font-black uppercase font-black">Scientific Assessment (mm)</p>
-                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 cyan-bg text-white px-10 py-2 text-sm font-black rounded-full italic font-black shadow-none font-black font-mono">
+                                        <div className="text-[90px] font-black cyan-text leading-none font-mono italic tabular-nums font-black font-black font-black tracking-tighter font-black">{report.range}</div>
+                                        <p className="text-[16px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-4 italic font-black font-black font-black uppercase">Scientific Assessment (mm)</p>
+                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 cyan-bg text-white px-10 py-2 text-sm font-black rounded-full italic font-black shadow-none font-black font-mono font-black">
                                             EXPECTED MEAN: {report.mean} mm
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-gray-50 p-8 border border-gray-100 rounded-[2.5rem] italic text-left relative mt-4 font-black font-black font-black">
+                            <div className="bg-gray-50 p-8 border border-gray-100 rounded-[2.5rem] italic text-left relative mt-4 font-black font-black font-black font-black">
                                 <div className="absolute -top-4 left-10 cyan-bg px-6 py-1 text-[10px] font-black text-white uppercase tracking-widest rounded-full italic font-black font-black uppercase shadow-none font-black">BPI Core Diagnostic Insights</div>
-                                <div className="space-y-3 pt-2 bg-gray-50 font-black font-black font-black">
+                                <div className="space-y-3 pt-2 bg-gray-50 font-black font-black font-black font-black">
                                     {report.advices.map((adv, i) => (
-                                        <p key={i} className="text-sm font-bold leading-relaxed text-black border-l-4 border-cyan-500 pl-6 italic font-black font-black font-black">「{adv}」</p>
+                                        <p key={i} className="text-sm font-bold leading-relaxed text-black border-l-4 border-cyan-500 pl-6 italic font-black font-black font-black font-black">「{adv}」</p>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="mt-auto pt-10 border-t border-gray-100 flex justify-between items-end bg-white font-black font-black">
-                              <div className="text-left space-y-2 bg-white font-black font-black font-black">
-                                <p className="text-[10px] text-gray-400 tracking-[0.3em] font-black uppercase italic font-black font-black font-black font-black uppercase">Verified Scientific Data • Bona Beetle Systems</p>
-                                <p className="text-[8px] text-gray-600 italic font-black font-black font-black font-black font-black italic font-black font-black font-black">© 2026 Bona Beetle Lab • 轉化模型已根據 PGK 專項數據校準 (BGI-PGK-STABLE)</p>
+                            <div className="mt-auto pt-10 border-t border-gray-100 flex justify-between items-end bg-white font-black font-black font-black">
+                              <div className="text-left space-y-2 bg-white font-black font-black font-black font-black font-black">
+                                <p className="text-[10px] text-gray-400 tracking-[0.3em] font-black uppercase italic font-black font-black font-black font-black uppercase font-black">Verified Scientific Data • Bona Beetle Systems</p>
+                                <p className="text-[8px] text-gray-600 italic font-black font-black font-black font-black font-black italic font-black font-black font-black font-black">© 2026 Bona Beetle Lab • 轉化模型已根據 PGK 專項數據校準 (BGI-PGK-STABLE)</p>
                               </div>
-                              <div className="w-16 h-16 border border-gray-100 p-1 bg-white flex items-center justify-center font-black font-black font-black font-black">
-                                 <div className="text-[6px] text-gray-300 text-center uppercase font-mono font-black font-black text-balance font-black font-black font-black">BBS-BGI-TECH<br/>QR-SECURE</div>
+                              <div className="w-16 h-16 border border-gray-100 p-1 bg-white flex items-center justify-center font-black font-black font-black font-black font-black">
+                                 <div className="text-[6px] text-gray-300 text-center uppercase font-mono font-black font-black text-balance font-black font-black font-black font-black">BBS-BGI-TECH<br/>QR-SECURE</div>
                               </div>
                             </div>
                           </div>
