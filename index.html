@@ -29,6 +29,7 @@
             overflow-x: hidden;
         }
 
+        /* 科技感藍圖網格背景 */
         .bg-blueprint {
             position: fixed; inset: 0; z-index: -1;
             background-size: 30px 30px;
@@ -41,7 +42,7 @@
         .animate-fade-up { animation: fadeUp 0.6s ease-out forwards; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* --- BGI 終極列印防護 --- */
+        /* --- BGI 終極列印防護：白色實體層方案 --- */
         @media print {
             @page { size: A4; margin: 0; }
             html, body { background: #FFFFFF !important; color: #000000 !important; margin: 0 !important; padding: 0 !important; }
@@ -58,13 +59,19 @@
                 box-sizing: border-box !important;
                 z-index: 9999 !important;
             }
+            * { box-shadow: none !important; text-shadow: none !important; animation: none !important; filter: none !important; transition: none !important; }
             .cyan-text { color: #06B6D4 !important; }
             .cyan-bg { background-color: #06B6D4 !important; }
             .border-cyan { border-color: #06B6D4 !important; }
         }
 
         .print-only { display: none; }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        
+        /* 強化日期選取器的外觀 */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -73,11 +80,17 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        const ActivityIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
+
         const App = () => {
-            const SYSTEM_NAME = "BONA GROWTH INDEX (BGI)"; 
-            const LOGO_URL = "https://atom-bunny-8f6.notion.site/image/attachment%3A3a5ee000-88a9-42c5-842f-34619d1099fc%3ABEETLE_LOGO.jpg?table=block&id=2df51f87-ec7c-80fe-a0ef-f3054ac7e61e&spaceId=c7751f87-ec7c-818c-8570-00032fe627bd&width=1420&userId=&cache=v2";
+            const BRAND_NAME = "BONA BEETLE";
+            const SYSTEM_NAME = "BONA GROWTH INDEX"; 
+            const SUB_NAME = "PGK Scientific Rearing Engine"; 
+            // 修正：使用本地檔案路徑
+            const LOGO_URL = "logo.png";
 
             const [view, setView] = useState('input'); 
+            const [report, setReport] = useState(null);
             const [formData, setFormData] = useState({ 
                 id: '', 
                 weight: '', 
@@ -85,10 +98,8 @@
                 check: new Date().toISOString().split('T')[0], 
                 sub: 'plus_b' 
             });
-            
-            const [report, setReport] = useState(null);
 
-            // BGI 核心預測引擎 (根據指令集微調)
+            // BGI 核心預測引擎 (根據最後定版邏輯)
             const runBGIEngine = (w, age, sub) => {
                 const thresholds = { fungus: 182, sawdust: 235, plus_b: 235 };
                 const threshold = thresholds[sub];
@@ -98,25 +109,21 @@
                 let lossRate = 0;
                 let remainingDays = 0;
 
-                // 總結規則 1: 放棄預測
+                // 核心判定規則 1: 放棄預測
                 if (age > 190 && w < 38) {
                     abandon = true;
                     advices.push("數據低於大蟲門檻，建議提早催蛹，不進行 110mm 預測。");
                 }
 
-                // 階段一：生長爆發期判定
+                // 核心判定規則 2: 生長期判定
                 if (age < threshold && !abandon) {
-                    const growthRate = w / age;
-                    if (growthRate >= 0.25) {
-                        advices.push("🔥 極高機率突破 110mm，請維持現狀。");
-                    } else if (growthRate <= 0.20) {
-                        advices.push("⚠️ 高機率低於 100mm，建議更換食材或補強血統。");
-                    } else {
-                        advices.push(`尚有機會，未來 ${threshold - age} 天內需增重至 40g。`);
-                    }
+                    const slope = w / age;
+                    if (slope >= 0.25) advices.push("🔥 極高機率突破 110mm，請維持現狀。");
+                    else if (slope <= 0.20) advices.push("⚠️ 高機率低於 100mm，建議更換食材或補強血統。");
+                    else advices.push(`尚有機會，未來 ${threshold - age} 天內需增重至 40g。`);
                 }
 
-                // 階段二：轉化期判定 & 損耗精算
+                // 損耗與轉化精算
                 if (sub === 'fungus') {
                     remainingDays = Math.max(0, 432 - age);
                     lossRate = 0.43 - ((0.43 - 0.25) / 250) * (age - 182);
@@ -130,13 +137,7 @@
                     else lossRate = 0.48 - ((0.48 - 0.34) / 250) * (age - 235);
                 }
 
-                // 強制規範損耗率邊界 (邏輯安全閥)
-                lossRate = Math.max(0.25, Math.min(0.50, lossRate));
-
-                // 蛹重計算
                 const pWeight = w * (1 - lossRate);
-
-                // 終極尺寸計算 (分段轉化模型)
                 let rate = 0;
                 let calcMode = "";
                 let finalSize = 0;
@@ -154,10 +155,7 @@
                 return {
                     id: formData.id,
                     diet: sub === 'plus_b' ? '登大蟲組' : sub === 'fungus' ? '菌瓶組' : '木屑組',
-                    age,
-                    weight: w,
-                    phase,
-                    remainingDays,
+                    age, weight: w, phase, remainingDays,
                     lossRate: (lossRate * 100).toFixed(1),
                     pupaWeight: pWeight.toFixed(1),
                     rate: rate.toFixed(2),
@@ -173,11 +171,8 @@
             const handleAnalyze = (e) => {
                 e.preventDefault();
                 setView('loading');
-                const h = new Date(formData.hatch);
-                const c = new Date(formData.check);
-                const age = Math.max(1, Math.floor((c - h) / 86400000));
+                const age = Math.max(1, Math.floor((new Date(formData.check) - new Date(formData.hatch)) / 86400000));
                 const res = runBGIEngine(parseFloat(formData.weight), age, formData.sub);
-                
                 setTimeout(() => {
                     setReport(res);
                     setView('report');
@@ -185,9 +180,9 @@
             };
 
             if (view === 'loading') return (
-                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 font-black">
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6">
                     <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                    <p className="text-[10px] text-cyan-500 font-mono tracking-[0.5em] animate-pulse uppercase italic">BGI_ENGINE_CALCULATING</p>
+                    <p className="text-[10px] text-cyan-500 font-mono tracking-[0.5em] animate-pulse uppercase italic">BGI_TECH_ANALYSIS_BOOTING</p>
                 </div>
             );
 
@@ -198,25 +193,25 @@
                     {view === 'input' && (
                         <div className="w-full max-w-md bg-zinc-900/90 border border-cyan-500/20 p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-xl animate-fade-up">
                             <header className="text-center mb-10">
-                                <img src={LOGO_URL} className="w-20 h-20 border border-cyan-500/40 p-1 mx-auto mb-6 bg-black rounded-2xl object-cover shadow-2xl" alt="Logo" />
+                                <img src={LOGO_URL} className="w-20 h-20 border border-cyan-500/40 p-1 mx-auto mb-6 bg-black rounded-2xl object-cover shadow-xl" alt="Logo" />
                                 <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase leading-none">
                                     BONA <span className="text-cyan-500">GROWTH INDEX</span>
                                 </h1>
-                                <p className="text-[9px] text-cyan-700 uppercase font-bold tracking-widest mt-2">PGK Scientific Rearing Engine</p>
+                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-2">{SUB_NAME}</p>
                             </header>
 
                             <form onSubmit={handleAnalyze} className="space-y-6">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] text-cyan-500 uppercase tracking-widest ml-1">個體編號</label>
-                                    <input required placeholder="例如：PGK-24-S01" className="bg-black/60 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-cyan-500 w-full font-mono" value={formData.id} onChange={e=>setFormData({...formData, id: e.target.value})} />
+                                    <label className="text-[10px] text-cyan-500 uppercase tracking-widest block ml-1">個體編號</label>
+                                    <input required placeholder="例如：PGK-2026-X" className="bg-black/60 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-cyan-500 w-full font-mono" value={formData.id} onChange={e=>setFormData({...formData, id: e.target.value})} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-gray-500 uppercase ml-1">挖出日期</label>
+                                        <label className="text-[10px] text-gray-500 uppercase block ml-1">挖出日期</label>
                                         <input type="date" required className="bg-black/60 border border-white/10 p-4 rounded-xl text-xs text-white w-full font-mono" value={formData.hatch} onChange={e=>setFormData({...formData, hatch: e.target.value})} />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-gray-500 uppercase ml-1">今日量測日期</label>
+                                        <label className="text-[10px] text-gray-500 uppercase block ml-1">測量日期</label>
                                         <input type="date" required className="bg-black/60 border border-white/10 p-4 rounded-xl text-xs text-white w-full font-mono" value={formData.check} onChange={e=>setFormData({...formData, check: e.target.value})} />
                                     </div>
                                 </div>
@@ -228,7 +223,7 @@
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] text-gray-500 uppercase ml-1 tracking-widest">飼育組別</label>
+                                    <label className="text-[10px] text-gray-500 uppercase ml-1 tracking-widest block">飼育組別</label>
                                     <div className="flex gap-2">
                                         {[ {id:'sawdust', l:'木屑'}, {id:'fungus', l:'菌瓶'}, {id:'plus_b', l:'登大蟲'} ].map(s => (
                                             <button key={s.id} type="button" onClick={()=>setFormData({...formData, sub: s.id})} className={`flex-1 py-4 rounded-xl text-[10px] font-black transition-all ${formData.sub === s.id ? 'bg-cyan-600 text-white shadow-lg' : 'bg-black/40 text-gray-600 border border-white/5'}`}>
@@ -237,7 +232,7 @@
                                         ))}
                                     </div>
                                 </div>
-                                <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-black py-5 rounded-2xl text-xs uppercase tracking-[0.3em] shadow-xl mt-4 active:scale-95 transition-all italic">啟動 BGI 科技預測引擎</button>
+                                <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-black py-5 rounded-2xl text-xs uppercase tracking-[0.3em] shadow-xl mt-4 active:scale-95 transition-all italic underline decoration-cyan-400 decoration-2">啟動 BGI 科技成長追蹤</button>
                             </form>
                         </div>
                     )}
@@ -246,35 +241,28 @@
                         <div id="web-view-ui" className="w-full max-w-2xl bg-zinc-900 border border-cyan-500/30 rounded-[3rem] overflow-hidden shadow-2xl relative animate-fade-up no-print">
                             <header className="p-8 border-b border-white/5 flex justify-between items-center bg-cyan-500/5">
                                 <div className="flex items-center gap-4">
-                                    <img src={LOGO_URL} className="w-12 h-12 border border-cyan-500/40 p-1 bg-black rounded-xl object-cover" alt="Logo" />
+                                    <img src={LOGO_URL} className="w-12 h-12 border border-cyan-500/40 p-1 bg-black rounded-xl object-cover shadow-lg" alt="Logo" />
                                     <div>
-                                        <h1 className="text-xl font-black text-white italic leading-none uppercase italic">BONA <span className="text-cyan-500">GROWTH INDEX</span></h1>
-                                        <p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase italic">Scientific Prediction Report</p>
+                                        <h1 className="text-xl font-black text-white italic leading-none uppercase">BONA <span className="text-cyan-500">GROWTH INDEX</span></h1>
+                                        <p className="text-[9px] text-gray-500 font-mono tracking-widest uppercase italic">Scientific Trajectory Analysis</p>
                                     </div>
                                 </div>
                                 <div className="text-right text-xs font-mono text-cyan-500">#{report.id}</div>
                             </header>
 
                             <main className="p-8 md:p-10 space-y-10">
-                                {/* 回覆範本要求內容 */}
-                                <div className="space-y-4">
-                                    <h2 className="text-lg font-black text-white italic uppercase tracking-tighter flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
-                                        📊 Bona AI 預測報告
-                                    </h2>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
-                                            <p className="text-[8px] text-zinc-600 uppercase mb-1">當前狀態</p>
-                                            <p className="text-sm font-black text-white">{report.diet}</p>
-                                        </div>
-                                        <div className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
-                                            <p className="text-[8px] text-zinc-600 uppercase mb-1">日齡 Age</p>
-                                            <p className="text-sm font-black text-white font-mono">{report.age}d</p>
-                                        </div>
-                                        <div className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
-                                            <p className="text-[8px] text-zinc-600 uppercase mb-1">體重 Weight</p>
-                                            <p className="text-sm font-black text-cyan-500 font-mono">{report.weight}g</p>
-                                        </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
+                                        <p className="text-[8px] text-zinc-600 uppercase mb-1">Diet 組別</p>
+                                        <p className="text-sm font-black text-white">{report.diet}</p>
+                                    </div>
+                                    <div className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
+                                        <p className="text-[8px] text-zinc-600 uppercase mb-1">Age 日齡</p>
+                                        <p className="text-sm font-black text-white font-mono">{report.age}d</p>
+                                    </div>
+                                    <div className="bg-black/40 p-5 rounded-2xl border border-white/5 text-center">
+                                        <p className="text-[8px] text-zinc-600 uppercase mb-1">Weight 體重</p>
+                                        <p className="text-sm font-black text-cyan-500 font-mono">{report.weight}g</p>
                                     </div>
                                 </div>
 
@@ -293,7 +281,7 @@
                                     <h3 className="text-xs text-zinc-500 uppercase tracking-widest border-l-2 border-cyan-500 pl-3">轉化效率分析</h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="bg-black/30 p-6 rounded-2xl border border-white/5">
-                                            <p className="text-[9px] text-zinc-600 uppercase mb-2">預計轉化期剩餘</p>
+                                            <p className="text-[9px] text-zinc-600 uppercase mb-2">預計化蛹剩餘</p>
                                             <p className="text-3xl font-black italic">{report.remainingDays} <small className="text-xs">天</small></p>
                                         </div>
                                         <div className="bg-black/30 p-6 rounded-2xl border border-white/5">
@@ -303,12 +291,11 @@
                                     </div>
                                 </div>
 
-                                {/* 預測結果展示 */}
                                 <div className="bg-cyan-500/10 border border-cyan-500/30 p-10 rounded-[3.5rem] text-center relative overflow-hidden">
                                     <p className="text-[10px] text-cyan-500 font-black uppercase tracking-[0.4em] mb-4">Predicted Adult Potential</p>
                                     
                                     {report.abandon ? (
-                                        <div className="text-orange-500 text-sm font-black px-4 leading-relaxed">
+                                        <div className="text-orange-500 text-sm font-black px-4 leading-relaxed italic">
                                             {report.advices[0]}
                                         </div>
                                     ) : (
@@ -317,17 +304,16 @@
                                                 {report.mean} <span className="text-2xl font-mono">mm</span>
                                             </div>
                                             <div className="inline-block bg-black/50 px-6 py-2 rounded-full border border-cyan-500/20">
-                                                <span className="text-[10px] text-zinc-500 uppercase mr-3">預估範圍</span>
+                                                <span className="text-[10px] text-zinc-500 uppercase mr-3 italic">誤差範圍</span>
                                                 <span className="text-sm text-cyan-500 font-mono tracking-tighter">{report.sizeMin} ~ {report.sizeMax} mm</span>
                                             </div>
                                         </>
                                     )}
                                 </div>
 
-                                {/* 診斷建議卡片 */}
                                 <div className="bg-white text-black p-8 rounded-[2.5rem] space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center text-cyan-500 font-black">B</div>
+                                        <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center text-cyan-500 font-black shadow-lg">B</div>
                                         <span className="text-[10px] uppercase font-black tracking-widest text-zinc-400">BGI Diagnostic Insights</span>
                                     </div>
                                     <div className="space-y-3">
@@ -336,8 +322,8 @@
                                         ))}
                                     </div>
                                     <div className="pt-4 border-t border-zinc-100 flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                                        <span>預估轉化率：{report.rate} mm/g</span>
                                         <span>模式：{report.calcMode}</span>
+                                        <span>轉化率：{report.rate} mm/g</span>
                                     </div>
                                 </div>
 
@@ -368,32 +354,32 @@
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-8 mb-10 border-b border-gray-100 pb-8 bg-white font-black">
+                            <div className="grid grid-cols-2 gap-8 mb-10 border-b border-gray-100 pb-8 bg-white">
                                 <div className="space-y-4">
                                     <h3 className="text-[10px] text-gray-300 font-black uppercase tracking-widest border-l-4 border-cyan-500 pl-2">Current Status</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <p><span className="text-gray-400">Diet 組別:</span> <span className="font-bold">{report.diet}</span></p>
-                                        <p><span className="text-gray-400">Age 日齡:</span> <span className="font-bold font-mono">{report.age}d</span></p>
-                                        <p><span className="text-gray-400">Weight 體重:</span> <span className="font-bold font-mono">{report.weight}g</span></p>
+                                    <div className="space-y-2 text-sm italic font-bold">
+                                        <p><span className="text-gray-400">Diet 組別:</span> {report.diet}</p>
+                                        <p><span className="text-gray-400">Age 日齡:</span> {report.age}d</p>
+                                        <p><span className="text-gray-400">Weight 體重:</span> {report.weight}g</p>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <h3 className="text-[10px] text-gray-300 font-black uppercase tracking-widest border-l-4 border-cyan-500 pl-2">Conversion Metrics</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <p><span className="text-gray-400">Phase 判定:</span> <span className="font-bold italic uppercase">{report.phase}</span></p>
-                                        <p><span className="text-gray-400">Loss Rate 損耗:</span> <span className="font-bold text-orange-600 font-mono">{report.lossRate}%</span></p>
-                                        <p><span className="text-gray-400">Calc Mode 模式:</span> <span className="font-bold">{report.calcMode}</span></p>
+                                    <div className="space-y-2 text-sm italic font-bold">
+                                        <p><span className="text-gray-400">Phase 判定:</span> {report.phase}</p>
+                                        <p><span className="text-gray-400">Loss Rate 損耗:</span> <span className="text-orange-600">{report.lossRate}%</span></p>
+                                        <p><span className="text-gray-400">Calc Mode 模式:</span> {report.calcMode}</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex-1 flex flex-col justify-center items-center py-6 bg-white">
                                 <div className="text-center mb-8 bg-white">
-                                    <h2 className="text-[14px] font-black cyan-text uppercase tracking-[0.5em] mb-4 italic underline underline-offset-8 decoration-2 font-black">Predicted Final Range</h2>
-                                    <div className="bg-gray-50 py-12 px-20 rounded-[4rem] border border-gray-100 relative font-black">
+                                    <h2 className="text-[14px] font-black cyan-text uppercase tracking-[0.5em] mb-4 italic underline underline-offset-8 decoration-2">Predicted Final Range</h2>
+                                    <div className="bg-gray-50 py-12 px-20 rounded-[4rem] border border-gray-100 relative font-black shadow-none">
                                         <div className="text-[90px] font-black cyan-text leading-none font-mono italic tabular-nums tracking-tighter">{report.range}</div>
-                                        <p className="text-[16px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-4 italic font-black uppercase">Adult Length Assessment (mm)</p>
-                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 cyan-bg text-white px-10 py-2 text-sm font-black rounded-full italic font-mono">
+                                        <p className="text-[16px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-4 italic uppercase">Adult Length Assessment (mm)</p>
+                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 cyan-bg text-white px-10 py-2 text-sm font-black rounded-full italic font-mono shadow-none">
                                             EXPECTED MEAN: {report.mean} mm
                                         </div>
                                     </div>
@@ -401,7 +387,7 @@
                             </div>
 
                             <div className="bg-gray-50 p-10 border border-gray-100 rounded-[3rem] italic text-left relative mt-4">
-                                <div className="absolute -top-4 left-10 cyan-bg px-6 py-1 text-[10px] font-black text-white uppercase tracking-widest rounded-full italic font-black uppercase">BPI Scientific Diagnostics</div>
+                                <div className="absolute -top-4 left-10 cyan-bg px-6 py-1 text-[10px] font-black text-white uppercase tracking-widest rounded-full italic uppercase shadow-none">BPI Scientific Diagnostics</div>
                                 <div className="space-y-4 pt-2 bg-gray-50">
                                     {report.advices.map((adv, i) => (
                                         <p key={i} className="text-base font-bold leading-relaxed text-black border-l-4 border-cyan-500 pl-6 italic">「{adv}」</p>
@@ -411,10 +397,10 @@
 
                             <div className="mt-auto pt-10 border-t border-gray-100 flex justify-between items-end bg-white">
                               <div className="text-left space-y-2 bg-white">
-                                <p className="text-[10px] text-gray-300 tracking-[0.3em] font-black uppercase italic">Scientific Data Powered by Bona Beetle Lab</p>
+                                <p className="text-[10px] text-gray-300 tracking-[0.3em] font-black uppercase italic">Verified Scientific Data • Bona Beetle Lab</p>
                                 <p className="text-[8px] text-gray-400 italic">© 2026 BGI-PGK-STABLE • 轉化模型已根據 PGK 實測數據回歸校準 (R²=0.954)</p>
                               </div>
-                              <div className="w-16 h-16 border border-gray-100 p-1 bg-white flex items-center justify-center font-black">
+                              <div className="w-16 h-16 border border-gray-100 p-1 bg-white flex items-center justify-center">
                                  <div className="text-[6px] text-gray-300 text-center uppercase font-mono font-black text-balance">BBS-BGI<br/>SECURED</div>
                               </div>
                             </div>
